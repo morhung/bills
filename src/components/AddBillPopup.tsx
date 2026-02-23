@@ -77,7 +77,7 @@ export function AddBillPopup({ isOpen, onClose, onSave, users, initialData }: Ad
         e.preventDefault();
         onSave({
             id: initialData?.id,
-            bill_date: new Date(billDate).toISOString(),
+            bill_date: billDate,
             user_id: userId,
             is_paid: isPaid,
             total_amount: totalAmount,
