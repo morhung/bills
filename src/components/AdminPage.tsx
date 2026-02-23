@@ -362,7 +362,7 @@ export function AdminPage({ bills }: AdminPageProps) {
                                                     </td>
                                                     <td className="px-6 py-5">
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-[11px] font-black text-slate-800 font-mono tracking-tight uppercase tabular-nums bg-slate-100 px-2 py-1 rounded-lg">@{u.tag_id}</span>
+                                                            <span className="text-[11px] font-black text-slate-800 font-mono tracking-tight uppercase tabular-nums bg-slate-100 px-2 py-1 rounded-lg">@{u.tag_id.replace('-runsystem.net', '')}</span>
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-5 text-right">

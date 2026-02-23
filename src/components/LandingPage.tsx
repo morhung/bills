@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useUsers } from '../hooks/useUsers';
+import { removeAccents } from '../utils/stringUtils';
 
 export function LandingPage() {
     const navigate = useNavigate();
@@ -11,19 +12,52 @@ export function LandingPage() {
 
     const filteredUsers = useMemo(() => {
         if (!searchQuery || !users) return [];
-        const cleanQuery = searchQuery.toLowerCase().trim();
-        return users.filter(u =>
-            u.user_name?.toLowerCase().includes(cleanQuery) ||
-            u.chatops_channel_id?.toLowerCase().includes(cleanQuery) ||
-            (u.tag_id && u.tag_id.toLowerCase().includes(cleanQuery))
-        ).slice(0, 5);
+        const cleanQuery = removeAccents(searchQuery.trim());
+
+        return users
+            .map(u => {
+                const userName = u.user_name || '';
+                const tagId = u.tag_id || '';
+                const strippedTagId = tagId.replace('-runsystem.net', '');
+
+                const normalizedName = removeAccents(userName);
+                const normalizedTagId = removeAccents(tagId);
+                const normalizedStrippedTagId = removeAccents(strippedTagId);
+
+                let score = 0;
+
+                // Priority 1: Exact search on tag_id (stripped or full)
+                if (normalizedStrippedTagId === cleanQuery || normalizedTagId === cleanQuery) {
+                    score = 100;
+                }
+                // Priority 2: Name starts with query
+                else if (normalizedName.startsWith(cleanQuery)) {
+                    score = 80;
+                }
+                // Priority 3: Tag ID starts with query
+                else if (normalizedStrippedTagId.startsWith(cleanQuery) || normalizedTagId.startsWith(cleanQuery)) {
+                    score = 60;
+                }
+                // Priority 4: Name contains query
+                else if (normalizedName.includes(cleanQuery)) {
+                    score = 40;
+                }
+                // Priority 5: Tag ID contains query
+                else if (normalizedTagId.includes(cleanQuery)) {
+                    score = 20;
+                }
+
+                return { ...u, score };
+            })
+            .filter(u => u.score > 0)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 5);
     }, [users, searchQuery]);
 
     const handleUserSelect = (user: any) => {
-        // Find the best non-empty identifier for the URL
-        const identifier = (user.chatops_channel_id && user.chatops_channel_id.trim()) ||
-            (user.tag_id && user.tag_id.trim()) ||
-            user.id;
+        // Use tag_id as the primary identifier for the URL, stripping the domain suffix
+        const rawTagId = user.tag_id?.trim() || '';
+        const identifier = rawTagId.replace('-runsystem.net', '') || user.id;
         navigate(`/${identifier}`);
     };
 
@@ -95,7 +129,7 @@ export function LandingPage() {
                                                     <div className="text-left">
                                                         <h4 className="font-black text-slate-900 uppercase italic tracking-tight">{u.user_name}</h4>
                                                         <p className="text-[10px] font-black text-slate-800/60 uppercase">
-                                                            {u.chatops_channel_id?.trim() ? `@${u.chatops_channel_id}` : (u.tag_id?.trim() ? `@${u.tag_id}` : 'Chưa có ID')}
+                                                            {u.tag_id?.trim() ? `@${u.tag_id}` : 'Chưa có ID'}
                                                         </p>
                                                     </div>
                                                 </div>
