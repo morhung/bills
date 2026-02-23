@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+
+    html,
+    body,
+    #root {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+    }
+
+    body {
+        font-family: "Plus Jakarta Sans", sans-serif;
+        @apply text-slate-900 antialiased relative;
+        background-color: #f6f8f8;
+    }
+
+    /* Refined Mesh Gradient Background - Optimized for High-Weight Light Mode */
+    body::before {
+        content: "";
+        position: fixed;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        z-index: -1;
+        background: radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.12) 0%, transparent 40%),
+            radial-gradient(circle at 85% 85%, rgba(54, 212, 226, 0.1) 0%, transparent 40%),
+            radial-gradient(circle at 50% 50%, rgba(244, 63, 94, 0.05) 0%, transparent 60%);
+        animation: mesh 15s ease infinite;
+        pointer-events: none;
+    }
+}
+
+@layer components {
+    .glass {
+        @apply bg-white/50 backdrop-blur-2xl border border-white/30 shadow-xl shadow-black/5;
+    }
+
+    .glass-card {
+        @apply glass rounded-2xl transition-all duration-300 hover:bg-white/60 hover:scale-[1.01] hover:shadow-2xl hover:shadow-secondary/20;
+    }
+}
+
+.expanded-row {
+    display: table-row;
+}
+
+/* Custom Scrollbar for the Bill List */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    @apply bg-slate-200 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-300;
+}
