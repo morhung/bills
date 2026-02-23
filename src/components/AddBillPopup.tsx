@@ -50,7 +50,7 @@ export function AddBillPopup({ isOpen, onClose, onSave, users, initialData }: Ad
         if (!normalizedQuery) return users;
         return users.filter(u =>
             removeAccents(u.user_name || '').includes(normalizedQuery) ||
-            removeAccents(u.chatops_id || '').includes(normalizedQuery) ||
+            removeAccents(u.chatops_channel_id || '').includes(normalizedQuery) ||
             removeAccents(u.tag_id || '').includes(normalizedQuery)
         );
     }, [userSearchQuery, users]);
@@ -201,7 +201,7 @@ export function AddBillPopup({ isOpen, onClose, onSave, users, initialData }: Ad
                                                                     </div>
                                                                     <div className="flex flex-col">
                                                                         <span className={`text-xs font-black tracking-tight ${userId === u.id ? 'text-secondary' : 'text-slate-700'}`}>{u.user_name}</span>
-                                                                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">@{u.chatops_id}</span>
+                                                                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">@{u.chatops_channel_id}</span>
                                                                     </div>
                                                                 </div>
                                                                 {userId === u.id && <Check size={14} className="text-secondary" />}

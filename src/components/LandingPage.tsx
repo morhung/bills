@@ -14,14 +14,14 @@ export function LandingPage() {
         const cleanQuery = searchQuery.toLowerCase().trim();
         return users.filter(u =>
             u.user_name?.toLowerCase().includes(cleanQuery) ||
-            u.chatops_id?.toLowerCase().includes(cleanQuery) ||
+            u.chatops_channel_id?.toLowerCase().includes(cleanQuery) ||
             (u.tag_id && u.tag_id.toLowerCase().includes(cleanQuery))
         ).slice(0, 5);
     }, [users, searchQuery]);
 
     const handleUserSelect = (user: any) => {
         // Find the best non-empty identifier for the URL
-        const identifier = (user.chatops_id && user.chatops_id.trim()) ||
+        const identifier = (user.chatops_channel_id && user.chatops_channel_id.trim()) ||
             (user.tag_id && user.tag_id.trim()) ||
             user.id;
         navigate(`/${identifier}`);
@@ -95,7 +95,7 @@ export function LandingPage() {
                                                     <div className="text-left">
                                                         <h4 className="font-black text-slate-900 uppercase italic tracking-tight">{u.user_name}</h4>
                                                         <p className="text-[10px] font-black text-slate-800/60 uppercase">
-                                                            {u.chatops_id?.trim() ? `@${u.chatops_id}` : (u.tag_id?.trim() ? `@${u.tag_id}` : 'Chưa có ID')}
+                                                            {u.chatops_channel_id?.trim() ? `@${u.chatops_channel_id}` : (u.tag_id?.trim() ? `@${u.tag_id}` : 'Chưa có ID')}
                                                         </p>
                                                     </div>
                                                 </div>

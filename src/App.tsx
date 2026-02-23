@@ -34,9 +34,9 @@ const MainView = ({ bills, isLoading, error, session }: any) => {
                 u.tag_id.toLowerCase() === cleanId ||
                 u.tag_id.toLowerCase() === `${cleanId}-runsystem.net`
             )) ||
-            (u.chatops_id && (
-                u.chatops_id === userId ||
-                u.chatops_id.toLowerCase() === cleanId
+            (u.chatops_channel_id && (
+                u.chatops_channel_id === userId ||
+                u.chatops_channel_id.toLowerCase() === cleanId
             ))
         );
     }, [users, userId]);
@@ -49,7 +49,7 @@ const MainView = ({ bills, isLoading, error, session }: any) => {
             return bills.filter((b: any) =>
                 b.user_id === targetUser.id ||
                 b.user_id === targetUser.tag_id ||
-                b.user_id === targetUser.chatops_id
+                b.user_id === targetUser.chatops_channel_id
             );
         }
 

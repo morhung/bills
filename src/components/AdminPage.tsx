@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, FileText, Settings, Shield, Trash2, Edit3, Plus, Loader2 } from 'lucide-react';
+import { Search, FileText, Settings, Shield, Trash2, Edit3, Plus, Loader2, Bell, CreditCard } from 'lucide-react';
 import type { DetailedBill, BillItem, User } from '../types/database';
 import React from 'react'; // Added React import for React.Fragment
 import { AddBillPopup } from './AddBillPopup';
@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase';
 import { useUsers } from '../hooks/useUsers';
 import { useQueryClient } from '@tanstack/react-query';
 import { billService } from '../services/billService';
+import { chatopsService } from '../services/chatopsService';
 import { removeAccents } from '../utils/stringUtils';
 
 interface AdminPageProps {
@@ -33,7 +34,7 @@ export function AdminPage({ bills }: AdminPageProps) {
 
         return users.filter((u: User) =>
             removeAccents(u.user_name || '').includes(normalizedSearch) ||
-            removeAccents(u.chatops_id || '').includes(normalizedSearch) ||
+            removeAccents(u.chatops_channel_id || '').includes(normalizedSearch) ||
             removeAccents(u.tag_id || '').includes(normalizedSearch) ||
             removeAccents(u.email || '').includes(normalizedSearch)
         );
@@ -93,7 +94,7 @@ export function AdminPage({ bills }: AdminPageProps) {
                     .from('users')
                     .update({
                         tag_id: userData.tag_id,
-                        chatops_id: userData.chatops_id,
+                        chatops_channel_id: userData.chatops_channel_id,
                         user_name: userData.user_name,
                         email: userData.email,
                         role: userData.role
@@ -109,7 +110,7 @@ export function AdminPage({ bills }: AdminPageProps) {
                     .insert([{
                         id: crypto.randomUUID(),
                         tag_id: userData.tag_id,
-                        chatops_id: userData.chatops_id,
+                        chatops_channel_id: userData.chatops_channel_id,
                         user_name: userData.user_name,
                         email: userData.email,
                         role: userData.role
@@ -143,6 +144,74 @@ export function AdminPage({ bills }: AdminPageProps) {
             queryClient.invalidateQueries({ queryKey: ['users'] });
         } catch (error: any) {
             console.error('Error deleting user:', error);
+            alert('Lỗi: ' + error.message);
+        }
+    };
+
+    const handleNotifyUser = async (user: User) => {
+        if (!user.total_unpaid || user.total_unpaid <= 0) return;
+
+        const message = `🔔 Nhắc nợ: @${user.tag_id} ơi, bạn hiện đang có khoản nợ nước tổng cộng là **${user.total_unpaid.toLocaleString('vi-VN')}đ**. Vui lòng thanh toán giúp mình nhé! 🙏`;
+
+        try {
+            let success = false;
+
+            const targetChannel = user.chatops_channel_id || "3it5zuqw3bnk3bwkspuyhsotce";
+            const postId = await chatopsService.postMessage(message, targetChannel);
+            if (postId) {
+                success = true;
+                const { error: updateError } = await supabase
+                    .from('users')
+                    .update({ last_post_id: postId })
+                    .eq('id', user.id);
+
+                if (updateError) console.error('Error saving last_post_id:', updateError);
+
+                // Invalidate users query to refresh last_post_id in UI state
+                queryClient.invalidateQueries({ queryKey: ['users'] });
+            }
+
+            if (success) {
+                alert(`Đã gửi thông báo nhắc nợ đến @${user.tag_id} thành công!`);
+            } else {
+                alert('Không thể gửi thông báo. Vui lòng kiểm tra lại cấu hình ChatOps.');
+            }
+        } catch (error) {
+            console.error('Failed to notify user:', error);
+            alert('Lỗi khi gửi thông báo.');
+        }
+    };
+
+    const handlePayUserBills = async (user: User) => {
+        if (!confirm(`Bạn có chắc muốn đánh dấu TẤT CẢ hóa đơn của "${user.user_name}" (Tổng: ${user.total_unpaid?.toLocaleString('vi-VN')}đ) là ĐÃ THANH TOÁN?`)) return;
+
+        try {
+            const { error } = await supabase
+                .from('bills')
+                .update({ is_paid: true })
+                .eq('user_id', user.id)
+                .eq('is_paid', false);
+
+            if (error) throw error;
+
+            // Nếu có last_post_id (thread nhắc nợ), gửi tin nhắn cảm ơn và xóa id đó
+            if (user.last_post_id) {
+                const thankYouMessage = `✅ Cảm ơn @${user.tag_id} đã thanh toán số tiền **${user.total_unpaid?.toLocaleString('vi-VN')}đ**. Đã ghi nhận thành công! ❤️`;
+                const targetChannel = user.chatops_channel_id || "3it5zuqw3bnk3bwkspuyhsotce";
+                await chatopsService.replyMessage(thankYouMessage, targetChannel, user.last_post_id);
+
+                // Xóa last_post_id để lần nợ sau sẽ tạo thread mới
+                await supabase
+                    .from('users')
+                    .update({ last_post_id: null })
+                    .eq('id', user.id);
+            }
+
+            alert('Thanh toán thành công!');
+            queryClient.invalidateQueries({ queryKey: ['bills'] });
+            queryClient.invalidateQueries({ queryKey: ['users'] });
+        } catch (error: any) {
+            console.error('Error paying user bills:', error);
             alert('Lỗi: ' + error.message);
         }
     };
@@ -266,7 +335,9 @@ export function AdminPage({ bills }: AdminPageProps) {
                                         <thead>
                                             <tr className="border-b border-white/30">
                                                 <th className="px-6 py-4 text-[10px] font-black text-slate-800 uppercase tracking-widest">Tên người dùng</th>
-                                                <th className="px-6 py-4 text-[10px] font-black text-slate-800 uppercase tracking-widest">Chatops ID</th>
+                                                <th className="px-6 py-4 text-[10px] font-black text-slate-800 uppercase tracking-widest">Tag ID</th>
+                                                <th className="px-6 py-4 text-right text-[10px] font-black text-slate-800 uppercase tracking-widest">Đã trả</th>
+                                                <th className="px-6 py-4 text-right text-[10px] font-black text-slate-800 uppercase tracking-widest">Chưa trả</th>
                                                 <th className="px-6 py-4 text-[10px] font-black text-slate-800 uppercase tracking-widest text-center">Vai trò</th>
                                                 <th className="px-6 py-4 text-right text-[10px] font-black text-slate-800 uppercase tracking-widest">Thao tác</th>
                                             </tr>
@@ -291,8 +362,16 @@ export function AdminPage({ bills }: AdminPageProps) {
                                                     </td>
                                                     <td className="px-6 py-5">
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-[11px] font-black text-slate-800 font-mono tracking-tight uppercase tabular-nums bg-slate-100 px-2 py-1 rounded-lg">@{u.chatops_id}</span>
+                                                            <span className="text-[11px] font-black text-slate-800 font-mono tracking-tight uppercase tabular-nums bg-slate-100 px-2 py-1 rounded-lg">@{u.tag_id}</span>
                                                         </div>
+                                                    </td>
+                                                    <td className="px-6 py-5 text-right">
+                                                        <span className="text-[13px] font-black text-emerald-600 font-display">{(u.total_paid || 0).toLocaleString('vi-VN')}đ</span>
+                                                    </td>
+                                                    <td className="px-6 py-5 text-right">
+                                                        <span className={`text-[13px] font-black font-display ${(u.total_unpaid || 0) > 0 ? 'text-rose-500' : 'text-slate-400'}`}>
+                                                            {(u.total_unpaid || 0).toLocaleString('vi-VN')}đ
+                                                        </span>
                                                     </td>
                                                     <td className="px-6 py-5 text-center">
                                                         <div className="flex items-center justify-center gap-2">
@@ -304,6 +383,24 @@ export function AdminPage({ bills }: AdminPageProps) {
                                                     </td>
                                                     <td className="px-6 py-5 text-right">
                                                         <div className="flex items-center justify-end gap-3 transition-all duration-500">
+                                                            {(u.total_unpaid || 0) > 0 && (
+                                                                <>
+                                                                    <button
+                                                                        onClick={() => handleNotifyUser(u)}
+                                                                        className="w-9 h-9 rounded-xl glass flex items-center justify-center text-slate-500 hover:text-amber-500 hover:bg-white hover:shadow-lg transition-all"
+                                                                        title="Thông báo nhắc nợ"
+                                                                    >
+                                                                        <Bell size={16} strokeWidth={2.5} />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handlePayUserBills(u)}
+                                                                        className="w-9 h-9 rounded-xl glass flex items-center justify-center text-slate-500 hover:text-emerald-500 hover:bg-white hover:shadow-lg transition-all"
+                                                                        title="Thanh toán tất cả"
+                                                                    >
+                                                                        <CreditCard size={16} strokeWidth={2.5} />
+                                                                    </button>
+                                                                </>
+                                                            )}
                                                             <button
                                                                 onClick={() => {
                                                                     setEditingUser(u);

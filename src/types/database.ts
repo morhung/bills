@@ -1,11 +1,14 @@
 export type User = {
     id: string;
     tag_id: string;
-    chatops_id: string;
+    chatops_channel_id: string;
     user_name: string;
     role: number;
     email: string;
     avatar_url: string | null;
+    last_post_id?: string | null;
+    total_unpaid?: number;
+    total_paid?: number;
 };
 
 export type BillStatus = 'unpaid' | 'paid' | 'pending';

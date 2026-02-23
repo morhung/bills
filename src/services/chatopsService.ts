@@ -65,9 +65,9 @@ export const chatopsService = {
     },
 
     /**
-     * Find Tag ID for a specific user ID
+     * Fetch internal ChatOps ID (channel ID) for a specific user ID
      */
-    async findTagId(userId: string): Promise<string | null> {
+    async fetchChatopsId(userId: string): Promise<string | null> {
         try {
             const url = `${chatOpsHost}/users/me/teams/orgx3i1z9fg1pn9y4fe3zctwuo/channels?include_deleted=true`;
             const headers = getHeaders();
@@ -86,8 +86,65 @@ export const chatopsService = {
             const filteredChannel = data.find((channel: ChatOpsChannel) => channel.name.includes(userId));
             return filteredChannel?.id || null;
         } catch (error) {
-            console.error('Error finding Tag ID in ChatOps:', error);
+            console.error('Error fetching ChatOps ID in ChatOps:', error);
             return null;
+        }
+    },
+
+    /**
+     * Send a new post to ChatOps and return the post ID
+     */
+    async postMessage(message: string, channelId: string = "3it5zuqw3bnk3bwkspuyhsotce"): Promise<string | null> {
+        try {
+            const url = `${chatOpsHost}/posts`;
+            const headers = getHeaders();
+            const payload = {
+                message: message,
+                channel_id: channelId,
+            };
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                throw new Error(`ChatOps API error: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            return data.id || null;
+        } catch (error) {
+            console.error('Error in postMessage:', error);
+            return null;
+        }
+    },
+
+    /**
+     * Reply to an existing post (thread)
+     */
+    async replyMessage(message: string, channelId: string, parentId: string): Promise<boolean> {
+        try {
+            const url = `${chatOpsHost}/posts`;
+            const headers = getHeaders();
+            const payload = {
+                message: message,
+                channel_id: channelId,
+                parent_id: parentId,
+                root_id: parentId
+            };
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify(payload)
+            });
+
+            return response.ok;
+        } catch (error) {
+            console.error('Error in replyMessage:', error);
+            return false;
         }
     }
 };

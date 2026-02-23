@@ -27,7 +27,7 @@ export function AddUserPopup({ isOpen, onClose, onSave, initialData }: AddUserPo
     useEffect(() => {
         if (initialData && isOpen) {
             setTagId(initialData.tag_id || '');
-            setChatopsId(initialData.chatops_id || '');
+            setChatopsId(initialData.chatops_channel_id || '');
             setUserName(initialData.user_name || '');
             setEmail(initialData.email || '');
             setRole(initialData.role || 0);
@@ -69,17 +69,17 @@ export function AddUserPopup({ isOpen, onClose, onSave, initialData }: AddUserPo
 
     const handleSelectUser = async (user: ChatOpsUser) => {
         setUserName(`${user.first_name} ${user.last_name}`.trim());
-        setChatopsId(user.username);
+        setTagId(user.username);
         setEmail(user.email);
         setShowSuggestions(false);
 
-        // Fetch Tag ID
+        // Fetch ChatOps ID (Internal ID)
         setIsLoadingSuggestions(true);
         try {
-            const fetchedTagId = await chatopsService.findTagId(user.id);
-            if (fetchedTagId) setTagId(fetchedTagId);
+            const fetchedChatopsId = await chatopsService.fetchChatopsId(user.id);
+            if (fetchedChatopsId) setChatopsId(fetchedChatopsId);
         } catch (error) {
-            console.error('Failed to fetch Tag ID:', error);
+            console.error('Failed to fetch ChatOps ID:', error);
         } finally {
             setIsLoadingSuggestions(false);
         }
@@ -92,7 +92,7 @@ export function AddUserPopup({ isOpen, onClose, onSave, initialData }: AddUserPo
             await onSave({
                 id: initialData?.id,
                 tag_id: tagId,
-                chatops_id: chatopsId,
+                chatops_channel_id: chatopsId,
                 user_name: userName,
                 email: email,
                 role: role

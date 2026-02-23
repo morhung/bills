@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import type { User } from '../types/database';
+import { userService } from '../services/userService';
 
 export function useUsers() {
     const queryClient = useQueryClient();
@@ -9,13 +9,7 @@ export function useUsers() {
     const { data: users, isLoading, error } = useQuery({
         queryKey: ['users'],
         queryFn: async () => {
-            const { data, error } = await supabase
-                .from('users')
-                .select('*')
-                .order('user_name', { ascending: true });
-
-            if (error) throw error;
-            return data as User[];
+            return await userService.getUsers();
         }
     });
 
