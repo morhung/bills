@@ -24,7 +24,8 @@ const getHeaders = (authToken = coMmAuthToken, csrfToken = coCsrfToken) => {
     };
 
     if (authToken) {
-        headers["cookie"] = `MMAUTHTOKEN=${authToken}`;
+        headers["Authorization"] = `Bearer ${authToken}`;
+        headers["X-Auth-Token"] = authToken;
     }
 
     if (csrfToken) {
@@ -44,7 +45,7 @@ export const chatopsService = {
         try {
             const url = `${chatOpsHost}/users/autocomplete?in_team=orgx3i1z9fg1pn9y4fe3zctwuo&in_channel=&limit=25&name=${encodeURIComponent(name)}`;
             const headers = getHeaders();
-            console.log('Fetching ChatOps (Fetch):', url, { headers });
+            console.log('Fetching ChatOps (Fetch):', url, headers);
 
             const response = await fetch(url, {
                 method: 'GET',

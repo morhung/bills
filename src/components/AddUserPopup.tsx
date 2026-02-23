@@ -68,7 +68,7 @@ export function AddUserPopup({ isOpen, onClose, onSave, initialData }: AddUserPo
     }, [userName, showSuggestions]);
 
     const handleSelectUser = async (user: ChatOpsUser) => {
-        setUserName(user.nickname || `${user.first_name} ${user.last_name}`.trim() || user.username);
+        setUserName(`${user.first_name} ${user.last_name}`.trim());
         setChatopsId(user.username);
         setEmail(user.email);
         setShowSuggestions(false);
