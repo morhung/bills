@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ArrowRight, Receipt, ShieldCheck, Zap } from 'lucide-react';
+import { Search, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useUsers } from '../hooks/useUsers';
 

@@ -2,7 +2,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { billService } from '../services/billService';
-import type { DetailedBill } from '../types/database';
 
 export function useBills() {
     const queryClient = useQueryClient();
