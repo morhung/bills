@@ -1,6 +1,6 @@
 const chatOpsHost = "https://chat.runsystem.vn/api/v4";
-const coCsrfToken = "edj91ri7xpf3pksxte3uxr5toe"; // sender
-const coMmAuthToken = "utydwiwf5fyo58fauzqjpp5jww"; // sender
+const coCsrfToken = import.meta.env.VITE_CHATOPS_CSRF_TOKEN;
+const coMmAuthToken = import.meta.env.VITE_CHATOPS_MM_AUTH_TOKEN;
 
 export interface ChatOpsUser {
     id: string;
