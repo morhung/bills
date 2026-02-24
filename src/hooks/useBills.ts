@@ -2,15 +2,16 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { billService } from '../services/billService';
+import type { BillFilters } from '../services/billService';
 
-export function useBills() {
+export function useBills(filters?: BillFilters) {
     const queryClient = useQueryClient();
 
     const { data: bills, isLoading, error } = useQuery({
-        queryKey: ['bills'],
+        queryKey: ['bills', filters],
         queryFn: async () => {
             try {
-                return await billService.getBills();
+                return await billService.getBills(filters);
             } catch (err) {
                 console.error('Failed to fetch bills:', err);
                 throw err;

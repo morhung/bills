@@ -7,18 +7,16 @@ import { AddBillPopup } from './AddBillPopup';
 import { AddUserPopup } from './AddUserPopup';
 import { supabase } from '../lib/supabase';
 import { useUsers } from '../hooks/useUsers';
+import { useBills } from '../hooks/useBills';
 import { useQueryClient } from '@tanstack/react-query';
 import { billService } from '../services/billService';
 import { chatopsService } from '../services/chatopsService';
 import { removeAccents } from '../utils/stringUtils';
 
-interface AdminPageProps {
-    bills: DetailedBill[];
-}
-
-export function AdminPage({ bills }: AdminPageProps) {
+export function AdminPage() {
     const queryClient = useQueryClient();
     const { users, isLoading: isUsersLoading } = useUsers();
+    const { bills, isLoading: isBillsLoading, error: billsError } = useBills();
     const [activeTab, setActiveTab] = useState<'users' | 'bills'>('users');
     const [searchQuery, setSearchQuery] = useState('');
     const [expandedBillId, setExpandedBillId] = useState<string | null>(null);
@@ -41,6 +39,7 @@ export function AdminPage({ bills }: AdminPageProps) {
     }, [searchQuery, users]);
 
     const filteredBills = useMemo(() => {
+        if (!bills) return [];
         const normalizedSearch = removeAccents(searchQuery).trim();
         if (!normalizedSearch) return bills;
 
@@ -427,141 +426,147 @@ export function AdminPage({ bills }: AdminPageProps) {
                                 </motion.div>
                             )
                         ) : (
-                            <motion.div
-                                key="bills"
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                                transition={{ duration: 0.3 }}
-                                className="space-y-4"
-                            >
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr className="border-b border-white/30">
-                                            <th className="px-6 py-4 text-[10px] font-black text-slate-800 uppercase tracking-widest">Hóa đơn</th>
-                                            <th className="px-6 py-4 text-[10px] font-black text-slate-800 uppercase tracking-widest">Người đặt</th>
-                                            <th className="px-6 py-4 text-right text-[10px] font-black text-slate-800 uppercase tracking-widest">Tổng tiền</th>
-                                            <th className="px-6 py-4 text-[10px] font-black text-slate-800 uppercase tracking-widest text-center">Trạng thái</th>
-                                            <th className="px-6 py-4 text-right text-[10px] font-black text-slate-800 uppercase tracking-widest">Thao tác</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-white/10">
-                                        {filteredBills.map((b: DetailedBill) => (
-                                            <React.Fragment key={b.id}>
-                                                <tr
-                                                    onClick={() => setExpandedBillId(expandedBillId === b.id ? null : b.id)}
-                                                    className={`group hover:bg-white/40 transition-colors cursor-pointer ${expandedBillId === b.id ? 'bg-white/50' : ''}`}
-                                                >
-                                                    <td className="px-6 py-5">
-                                                        <div className="flex items-center gap-4">
-                                                            <div className="w-11 h-11 rounded-2xl glass flex items-center justify-center text-slate-800 group-hover:text-secondary transition-colors">
-                                                                <span className="material-icons text-xl">{expandedBillId === b.id ? 'expand_less' : 'receipt'}</span>
-                                                            </div>
-                                                            <div className="flex flex-col">
-                                                                <span className="font-black text-slate-900 text-sm italic uppercase leading-none mb-1">{new Date(b.bill_date).toLocaleDateString('vi-VN')}</span>
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="text-[9px] font-black text-secondary uppercase tracking-[0.2em]">{b.bill_items.length} món</span>
-                                                                    <span className="w-1 h-1 rounded-full bg-slate-800"></span>
-                                                                    <span className="text-[9px] font-bold text-slate-800 font-mono">ID: {b.id.slice(0, 8)}</span>
+                            isBillsLoading ? (
+                                <div className="h-full flex items-center justify-center">
+                                    <Loader2 className="animate-spin text-secondary/60" size={48} strokeWidth={3} />
+                                </div>
+                            ) : (
+                                <motion.div
+                                    key="bills"
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -10 }}
+                                    transition={{ duration: 0.3 }}
+                                    className="space-y-4"
+                                >
+                                    <table className="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr className="border-b border-white/30">
+                                                <th className="px-6 py-4 text-[10px] font-black text-slate-800 uppercase tracking-widest">Hóa đơn</th>
+                                                <th className="px-6 py-4 text-[10px] font-black text-slate-800 uppercase tracking-widest">Người đặt</th>
+                                                <th className="px-6 py-4 text-right text-[10px] font-black text-slate-800 uppercase tracking-widest">Tổng tiền</th>
+                                                <th className="px-6 py-4 text-[10px] font-black text-slate-800 uppercase tracking-widest text-center">Trạng thái</th>
+                                                <th className="px-6 py-4 text-right text-[10px] font-black text-slate-800 uppercase tracking-widest">Thao tác</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-white/10">
+                                            {filteredBills.map((b: DetailedBill) => (
+                                                <React.Fragment key={b.id}>
+                                                    <tr
+                                                        onClick={() => setExpandedBillId(expandedBillId === b.id ? null : b.id)}
+                                                        className={`group hover:bg-white/40 transition-colors cursor-pointer ${expandedBillId === b.id ? 'bg-white/50' : ''}`}
+                                                    >
+                                                        <td className="px-6 py-5">
+                                                            <div className="flex items-center gap-4">
+                                                                <div className="w-11 h-11 rounded-2xl glass flex items-center justify-center text-slate-800 group-hover:text-secondary transition-colors">
+                                                                    <span className="material-icons text-xl">{expandedBillId === b.id ? 'expand_less' : 'receipt'}</span>
+                                                                </div>
+                                                                <div className="flex flex-col">
+                                                                    <span className="font-black text-slate-900 text-sm italic uppercase leading-none mb-1">{new Date(b.bill_date).toLocaleDateString('vi-VN')}</span>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-[9px] font-black text-secondary uppercase tracking-[0.2em]">{b.bill_items.length} món</span>
+                                                                        <span className="w-1 h-1 rounded-full bg-slate-800"></span>
+                                                                        <span className="text-[9px] font-bold text-slate-800 font-mono">ID: {b.id.slice(0, 8)}</span>
+                                                                    </div>
                                                                 </div>
                                                             </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-5">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center shadow-sm overflow-hidden">
-                                                                {b.users?.avatar_url ? (
-                                                                    <img src={b.users.avatar_url} alt="" className="w-full h-full object-cover" />
-                                                                ) : (
-                                                                    <span className="material-icons text-slate-800 text-lg">person</span>
-                                                                )}
+                                                        </td>
+                                                        <td className="px-6 py-5">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center shadow-sm overflow-hidden">
+                                                                    {b.users?.avatar_url ? (
+                                                                        <img src={b.users.avatar_url} alt="" className="w-full h-full object-cover" />
+                                                                    ) : (
+                                                                        <span className="material-icons text-slate-800 text-lg">person</span>
+                                                                    )}
+                                                                </div>
+                                                                <span className="font-black text-slate-900 text-[11px] tracking-tight uppercase italic">{b.users?.user_name || 'Hệ thống'}</span>
                                                             </div>
-                                                            <span className="font-black text-slate-900 text-[11px] tracking-tight uppercase italic">{b.users?.user_name || 'Hệ thống'}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-5 text-right">
-                                                        <div className={`flex items-baseline justify-end gap-1 ${b.total_amount < 0 ? 'text-orange-500' : !b.is_paid ? 'text-rose-500' : 'text-emerald-500'}`}>
-                                                            <span className="font-black text-base font-display tracking-tight drop-shadow-sm">{b.total_amount.toLocaleString('vi-VN')}</span>
-                                                            <span className="text-[10px] font-black italic">đ</span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-2">
-                                                        <div className="flex justify-center">
-                                                            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border shadow-sm ${b.is_paid
-                                                                ? 'bg-emerald-50/50 border-emerald-100 text-emerald-600'
-                                                                : 'bg-rose-50/50 border-rose-100 text-rose-500'
-                                                                }`}>
-                                                                <span className={`w-1.5 h-1.5 rounded-full ${b.is_paid ? 'bg-emerald-500' : 'bg-rose-500 animate-pulse'}`}></span>
-                                                                <span className="text-[9px] font-black uppercase tracking-widest">{b.is_paid ? 'Đã thu' : 'Chưa thu'}</span>
+                                                        </td>
+                                                        <td className="px-6 py-5 text-right">
+                                                            <div className={`flex items-baseline justify-end gap-1 ${b.total_amount < 0 ? 'text-orange-500' : !b.is_paid ? 'text-rose-500' : 'text-emerald-500'}`}>
+                                                                <span className="font-black text-base font-display tracking-tight drop-shadow-sm">{b.total_amount.toLocaleString('vi-VN')}</span>
+                                                                <span className="text-[10px] font-black italic">đ</span>
                                                             </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-5 text-right">
-                                                        <div className="flex items-center justify-end gap-3 transition-all duration-500">
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setEditingBill(b);
-                                                                    setIsAddBillOpen(true);
-                                                                }}
-                                                                className="w-9 h-9 rounded-xl glass flex items-center justify-center text-slate-800 hover:text-secondary hover:bg-white hover:shadow-lg transition-all"
-                                                                title="Chỉnh sửa"
-                                                            >
-                                                                <Edit3 size={16} strokeWidth={2.5} />
-                                                            </button>
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleDeleteBill(b);
-                                                                }}
-                                                                className="w-9 h-9 rounded-xl glass flex items-center justify-center text-slate-800 hover:text-accent hover:bg-white hover:shadow-lg transition-all"
-                                                                title="Xóa hóa đơn"
-                                                            >
-                                                                <Trash2 size={16} strokeWidth={2.5} />
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                                <AnimatePresence>
-                                                    {expandedBillId === b.id && (
-                                                        <tr key={`expand-${b.id}`}>
-                                                            <td colSpan={5} className="px-8 pb-6 bg-slate-50/30">
-                                                                <motion.div
-                                                                    initial={{ height: 0, opacity: 0 }}
-                                                                    animate={{ height: 'auto', opacity: 1 }}
-                                                                    exit={{ height: 0, opacity: 0 }}
-                                                                    transition={{ duration: 0.3, ease: 'easeInOut' }}
-                                                                    className="overflow-hidden bg-white/60 backdrop-blur-xl rounded-3xl border border-white shadow-inner px-6 py-0 mt-2"
+                                                        </td>
+                                                        <td className="px-6 py-2">
+                                                            <div className="flex justify-center">
+                                                                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border shadow-sm ${b.is_paid
+                                                                    ? 'bg-emerald-50/50 border-emerald-100 text-emerald-600'
+                                                                    : 'bg-rose-50/50 border-rose-100 text-rose-500'
+                                                                    }`}>
+                                                                    <span className={`w-1.5 h-1.5 rounded-full ${b.is_paid ? 'bg-emerald-500' : 'bg-rose-500 animate-pulse'}`}></span>
+                                                                    <span className="text-[9px] font-black uppercase tracking-widest">{b.is_paid ? 'Đã thu' : 'Chưa thu'}</span>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-5 text-right">
+                                                            <div className="flex items-center justify-end gap-3 transition-all duration-500">
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setEditingBill(b);
+                                                                        setIsAddBillOpen(true);
+                                                                    }}
+                                                                    className="w-9 h-9 rounded-xl glass flex items-center justify-center text-slate-800 hover:text-secondary hover:bg-white hover:shadow-lg transition-all"
+                                                                    title="Chỉnh sửa"
                                                                 >
-                                                                    <div className="space-y-3">
-                                                                        {b.bill_items.map((item: BillItem, idx: number) => (
-                                                                            <div key={idx} className="flex items-center justify-between px-3 py-0 rounded-2xl hover:bg-white/80 transition-colors border border-transparent hover:border-slate-100">
-                                                                                <div className="flex items-center gap-4">
-                                                                                    <div className="w-8 h-8 rounded-xl bg-secondary/5 flex items-center justify-center text-secondary">
-                                                                                        <span className="material-icons text-sm">local_cafe</span>
+                                                                    <Edit3 size={16} strokeWidth={2.5} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleDeleteBill(b);
+                                                                    }}
+                                                                    className="w-9 h-9 rounded-xl glass flex items-center justify-center text-slate-800 hover:text-accent hover:bg-white hover:shadow-lg transition-all"
+                                                                    title="Xóa hóa đơn"
+                                                                >
+                                                                    <Trash2 size={16} strokeWidth={2.5} />
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                    <AnimatePresence>
+                                                        {expandedBillId === b.id && (
+                                                            <tr key={`expand-${b.id}`}>
+                                                                <td colSpan={5} className="px-8 pb-6 bg-slate-50/30">
+                                                                    <motion.div
+                                                                        initial={{ height: 0, opacity: 0 }}
+                                                                        animate={{ height: 'auto', opacity: 1 }}
+                                                                        exit={{ height: 0, opacity: 0 }}
+                                                                        transition={{ duration: 0.3, ease: 'easeInOut' }}
+                                                                        className="overflow-hidden bg-white/60 backdrop-blur-xl rounded-3xl border border-white shadow-inner px-6 py-0 mt-2"
+                                                                    >
+                                                                        <div className="space-y-3">
+                                                                            {b.bill_items.map((item: BillItem, idx: number) => (
+                                                                                <div key={idx} className="flex items-center justify-between px-3 py-0 rounded-2xl hover:bg-white/80 transition-colors border border-transparent hover:border-slate-100">
+                                                                                    <div className="flex items-center gap-4">
+                                                                                        <div className="w-8 h-8 rounded-xl bg-secondary/5 flex items-center justify-center text-secondary">
+                                                                                            <span className="material-icons text-sm">local_cafe</span>
+                                                                                        </div>
+                                                                                        <div className="flex flex-col">
+                                                                                            <span className="text-xs font-black text-slate-800 tracking-tight">{item.item_name}</span>
+                                                                                            <span className="text-[9px] font-bold text-slate-800 uppercase tracking-widest">Số lượng: {item.quantity}</span>
+                                                                                        </div>
                                                                                     </div>
-                                                                                    <div className="flex flex-col">
-                                                                                        <span className="text-xs font-black text-slate-800 tracking-tight">{item.item_name}</span>
-                                                                                        <span className="text-[9px] font-bold text-slate-800 uppercase tracking-widest">Số lượng: {item.quantity}</span>
+                                                                                    <div className="flex items-baseline gap-1">
+                                                                                        <span className="text-xs font-black text-slate-900 font-display">{item.item_name ? (item.unit_price * item.quantity - item.discount_amount).toLocaleString('vi-VN') : 0}</span>
+                                                                                        <span className="text-[9px] font-black italic text-slate-800">đ</span>
                                                                                     </div>
                                                                                 </div>
-                                                                                <div className="flex items-baseline gap-1">
-                                                                                    <span className="text-xs font-black text-slate-900 font-display">{item.item_name ? (item.unit_price * item.quantity - item.discount_amount).toLocaleString('vi-VN') : 0}</span>
-                                                                                    <span className="text-[9px] font-black italic text-slate-800">đ</span>
-                                                                                </div>
-                                                                            </div>
-                                                                        ))}
-                                                                    </div>
-                                                                </motion.div>
-                                                            </td>
-                                                        </tr>
-                                                    )}
-                                                </AnimatePresence>
-                                            </React.Fragment>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </motion.div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </motion.div>
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                    </AnimatePresence>
+                                                </React.Fragment>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </motion.div>
+                            )
                         )}
                     </AnimatePresence>
                 </div>

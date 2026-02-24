@@ -1,26 +1,69 @@
 import { supabase } from '../lib/supabase';
-import type { DetailedBill } from '../types/database';
+import type { DetailedBill, ViewBill } from '../types/database';
+
+export interface BillFilters {
+    tagId?: string;
+    status?: 'paid' | 'unpaid';
+    month?: number;
+    year?: number;
+}
 
 export const billService = {
     /**
-     * Fetch all bills with their items and user information
+     * Fetch all bills using the getBills view with optimized filtering and sorting
      */
-    async getBills(): Promise<DetailedBill[]> {
-        const { data, error } = await supabase
-            .from('bills')
-            .select(`
-                *,
-                bill_items (*),
-                users:user_id (*)
-            `)
-            .order('bill_date', { ascending: false });
+    async getBills(filters?: BillFilters): Promise<DetailedBill[]> {
+        let query = supabase
+            .from('getBills')
+            .select('*');
+
+        // apply filters
+        if (filters?.tagId) {
+            query = query.eq('tag_id', filters.tagId);
+        }
+
+        if (filters?.status) {
+            query = query.eq('is_paid', filters.status === 'paid');
+
+            // Apply month/year filter only for paid status to optimize performance
+            // Unpaid bills are usually fewer and shown all at once
+            if (filters.status === 'paid' && filters.month !== undefined && filters.year !== undefined) {
+                const startDate = new Date(filters.year, filters.month, 1).toISOString();
+                const endDate = new Date(filters.year, filters.month + 1, 0).toISOString();
+                query = query.gte('bill_date', startDate).lte('bill_date', endDate);
+            }
+        }
+
+        // Sorting as requested: bill_date, tag_id, is_paid
+        const { data, error } = await query
+            .order('bill_date', { ascending: false })
+            .order('tag_id', { ascending: true })
+            .order('is_paid', { ascending: false });
 
         if (error) {
-            console.error('Error fetching bills:', error);
+            console.error('Error fetching bills from view:', error);
             throw error;
         }
 
-        return (data as any[]) || [];
+        // Map ViewBill back to DetailedBill structure for UI compatibility
+        return (data as ViewBill[]).map(viewBill => ({
+            id: viewBill.id,
+            bill_date: viewBill.bill_date,
+            total_amount: viewBill.total_amount,
+            is_paid: viewBill.is_paid,
+            user_id: viewBill.tag_id, // Map tag_id to user_id for compatibility
+            created_at: '', // Not in view
+            bill_items: viewBill.items || [], // Map items to bill_items
+            users: {
+                id: viewBill.tag_id,
+                tag_id: viewBill.tag_id,
+                user_name: viewBill.tag_id, // Use tag_id as name if missing in view
+                chatops_channel_id: '',
+                role: 0,
+                email: '',
+                avatar_url: null
+            }
+        })) as DetailedBill[];
     },
 
     /**

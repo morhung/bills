@@ -15,7 +15,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { generateVietQRString } from './services/vietQRService';
 import type { Session } from '@supabase/supabase-js';
 
-const MainView = ({ bills, isLoading, error, session }: any) => {
+const MainView = ({ session }: { session: Session | null }) => {
     const { userId } = useParams();
     const { users } = useUsers();
 
@@ -41,44 +41,28 @@ const MainView = ({ bills, isLoading, error, session }: any) => {
         );
     }, [users, userId]);
 
-    const displayBills = useMemo(() => {
-        if (!bills) return [];
-        if (!userId) return bills;
-
-        if (targetUser) {
-            return bills.filter((b: any) =>
-                b.user_id === targetUser.id ||
-                b.user_id === targetUser.tag_id ||
-                b.user_id === targetUser.chatops_channel_id
-            );
-        }
-
-        // Fallback for direct UUID/ID matching
-        return bills.filter((b: any) => b.user_id === userId);
-    }, [bills, userId, targetUser]);
+    // Fetch bills with server-side filtering
+    const { bills, isLoading, error } = useBills({
+        tagId: targetUser?.tag_id || userId,
+        status: statusFilter,
+        month: monthFilter,
+        year: yearFilter
+    });
 
     const totalDebt = useMemo(() => {
-        return displayBills.filter((b: any) => !b.is_paid).reduce((acc: number, b: any) => acc + (b.total_amount || 0), 0);
-    }, [displayBills]);
+        // Use total_unpaid from user record if available (most efficient)
+        if (targetUser && targetUser.total_unpaid !== undefined) {
+            return targetUser.total_unpaid;
+        }
+        // Fallback: manually calculate from the unpaid list if loaded
+        if (!bills || statusFilter === 'paid') return 0;
+        return bills.filter((b: any) => !b.is_paid).reduce((acc: number, b: any) => acc + (b.total_amount || 0), 0);
+    }, [targetUser, bills, statusFilter]);
 
     const qrLink = useMemo(() => {
         if (totalDebt <= 0) return '';
         return generateVietQRString(totalDebt);
-    }, [totalDebt, userId]);
-
-    const filteredBills = useMemo(() => {
-        return displayBills.filter((bill: any) => {
-            const isMatch = statusFilter === 'paid' ? bill.is_paid : !bill.is_paid;
-            if (!isMatch) return false;
-
-            if (statusFilter === 'paid') {
-                const billDate = new Date(bill.bill_date);
-                return billDate.getMonth() === monthFilter && billDate.getFullYear() === yearFilter;
-            }
-
-            return true;
-        });
-    }, [displayBills, statusFilter, monthFilter, yearFilter]);
+    }, [totalDebt]);
 
     const displayUserName = useMemo(() => {
         if (targetUser) return targetUser.user_name;
@@ -127,7 +111,7 @@ const MainView = ({ bills, isLoading, error, session }: any) => {
                                 </div>
                             ) : (
                                 <div className="pb-8">
-                                    <BillList bills={filteredBills} />
+                                    <BillList bills={bills || []} />
                                 </div>
                             )}
                         </div>
@@ -139,7 +123,6 @@ const MainView = ({ bills, isLoading, error, session }: any) => {
 };
 
 function App() {
-    const { bills, isLoading, error } = useBills();
     const location = useLocation();
     const [session, setSession] = useState<Session | null>(null);
     const [isInitialAuthLoading, setIsInitialAuthLoading] = useState(true);
@@ -174,7 +157,7 @@ function App() {
                     } />
 
                     <Route path="/" element={<LandingPage />} />
-                    <Route path="/:userId" element={<MainView bills={bills} isLoading={isLoading} error={error} session={session} />} />
+                    <Route path="/:userId" element={<MainView session={session} />} />
 
                     <Route path="/admin" element={
                         session ? (
@@ -189,7 +172,7 @@ function App() {
                                         exit={{ opacity: 0, x: -20 }}
                                         className="flex-1 flex flex-col h-full overflow-hidden"
                                     >
-                                        <AdminPage bills={bills || []} />
+                                        <AdminPage />
                                     </motion.div>
                                 </main>
                             </div>

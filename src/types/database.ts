@@ -37,3 +37,20 @@ export type DetailedBill = Bill & {
     bill_items: BillItem[];
     users: User | null;
 };
+
+// Type for the getBills view
+export type ViewBill = {
+    id: string;
+    bill_date: string;
+    tag_id: string;
+    total_amount: number;
+    is_paid: boolean;
+    items: {
+        id: string;
+        bill_id: string;
+        item_name: string;
+        quantity: number;
+        unit_price: number;
+        discount_amount: number;
+    }[];
+};
