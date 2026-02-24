@@ -60,18 +60,17 @@ export function Summary({ totalDebt, qrLink }: SummaryProps) {
                             </span>
                         </div>
 
-                        <a href={qrLink} target="_blank" rel="noopener noreferrer" className="block hover:scale-[1.02] transition-transform duration-300 w-full max-w-[200px]">
-                            <div className="aspect-square rounded-[2rem] bg-white p-3 shadow-xl relative overflow-hidden group/qr w-full border border-indigo-100">
+                        <div className="w-full max-w-[200px]">
+                            <div className="aspect-square rounded-[2rem] bg-white p-3 shadow-xl relative overflow-hidden w-full border border-indigo-100">
                                 <img
                                     src={qrLink}
                                     alt="VietQR"
                                     className="w-full h-full object-cover rounded-[1.25rem]"
                                 />
-                                <div className="absolute inset-0 bg-indigo-500/10 opacity-0 group-hover/qr:opacity-100 transition-opacity"></div>
                             </div>
-                        </a>
+                        </div>
                         <p className="text-[10px] text-slate-500 font-medium leading-relaxed mt-5">
-                            Sử dụng app ngân hàng quét mã<br />hoặc chạm để thanh toán
+                            Sử dụng app ngân hàng quét mã<br />để thanh toán
                         </p>
                     </div>
                 </div>

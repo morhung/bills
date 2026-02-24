@@ -136,7 +136,6 @@ export function BillList({ bills }: { bills: DetailedBill[] }) {
                 <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mb-6 text-slate-300 shadow-xl shadow-slate-200/50 border border-slate-100 group-hover:scale-110 group-hover:-rotate-6 transition-all duration-700 z-10">
                     <span className="material-icons text-5xl">receipt_long</span>
                 </div>
-                <h3 className="text-xl font-black text-slate-800 font-display mb-2 z-10">Trống rỗng!</h3>
                 <p className="text-sm text-slate-500 font-medium max-w-xs leading-relaxed z-10 mb-4">Chưa có giao dịch nào ở mục này !</p>
             </div>
         );

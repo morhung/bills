@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, FileText, Settings, Shield, Trash2, Edit3, Plus, Loader2, Bell, CreditCard } from 'lucide-react';
+import { Search, FileText, Shield, Trash2, Edit3, Plus, Loader2, Bell, CreditCard, ChevronLeft, ChevronRight, Calendar, User as UserIcon, LogOut } from 'lucide-react';
 import type { DetailedBill, BillItem, User } from '../types/database';
 import React from 'react'; // Added React import for React.Fragment
 import { AddBillPopup } from './AddBillPopup';
@@ -13,10 +13,37 @@ import { billService } from '../services/billService';
 import { chatopsService } from '../services/chatopsService';
 import { removeAccents } from '../utils/stringUtils';
 
-export function AdminPage() {
+export function AdminPage({ userEmail }: { userEmail?: string }) {
     const queryClient = useQueryClient();
     const { users, isLoading: isUsersLoading } = useUsers();
-    const { bills, isLoading: isBillsLoading, error: billsError } = useBills();
+
+    // Admin Filtering State
+    const [adminUserFilter, setAdminUserFilter] = useState<string>('hungnd-runsystem.net');
+    const [adminStatusFilter, setAdminStatusFilter] = useState<'unpaid' | 'paid'>('unpaid');
+    const [adminMonthFilter, setAdminMonthFilter] = useState(new Date().getMonth());
+    const [adminYearFilter, setAdminYearFilter] = useState(new Date().getFullYear());
+
+    // UI States for enhanced filters
+    const [userSearchInput, setUserSearchInput] = useState('hungnd-runsystem.net');
+    const [isUserSuggestionsOpen, setIsUserSuggestionsOpen] = useState(false);
+    const [isDatePopupOpen, setIsDatePopupOpen] = useState(false);
+
+    // Refs for outside click handling
+    const userSearchRef = useRef<HTMLDivElement>(null);
+    const datePopupRef = useRef<HTMLDivElement>(null);
+
+    const months = [
+        'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
+        'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'
+    ];
+
+    const { bills, isLoading: isBillsLoading } = useBills({
+        tagId: adminUserFilter === 'all' ? undefined : adminUserFilter,
+        status: adminStatusFilter,
+        month: adminStatusFilter === 'unpaid' ? undefined : adminMonthFilter, // Month/year only apply to 'paid' bills
+        year: adminStatusFilter === 'unpaid' ? undefined : adminYearFilter
+    });
+
     const [activeTab, setActiveTab] = useState<'users' | 'bills'>('users');
     const [searchQuery, setSearchQuery] = useState('');
     const [expandedBillId, setExpandedBillId] = useState<string | null>(null);
@@ -24,6 +51,45 @@ export function AdminPage() {
     const [isAddUserOpen, setIsAddUserOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [editingBill, setEditingBill] = useState<DetailedBill | null>(null);
+
+    const viewUserBills = (tagId: string) => {
+        setAdminUserFilter(tagId);
+        setUserSearchInput(tagId);
+        setAdminStatusFilter('unpaid');
+        setActiveTab('bills');
+        setSearchQuery('');
+    };
+
+    // Outside click handlers
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (isUserSuggestionsOpen && userSearchRef.current && !userSearchRef.current.contains(event.target as Node)) {
+                setIsUserSuggestionsOpen(false);
+            }
+            if (isDatePopupOpen && datePopupRef.current && !datePopupRef.current.contains(event.target as Node)) {
+                setIsDatePopupOpen(false);
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [isUserSuggestionsOpen, isDatePopupOpen]);
+
+    const userSuggestions = useMemo(() => {
+        if (!users) return [];
+        const input = userSearchInput.toLowerCase().replace('@', '').trim();
+
+        const filtered = users.filter(u =>
+            u.tag_id.toLowerCase().includes(input) ||
+            (u.user_name && u.user_name.toLowerCase().includes(input))
+        );
+
+        // Add "Tất cả" as first option if input matches "tat ca" or "all"
+        if ("tat ca".includes(input) || "all".includes(input)) {
+            return [{ id: 'all', tag_id: 'all', user_name: 'Tất cả' } as any, ...filtered];
+        }
+
+        return filtered;
+    }, [userSearchInput, users]);
 
     const filteredUsers = useMemo(() => {
         if (!users) return [];
@@ -215,6 +281,14 @@ export function AdminPage() {
         }
     };
 
+    const handleLogout = async () => {
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+            console.error('Error logging out:', error);
+            alert('Lỗi khi đăng xuất: ' + error.message);
+        }
+    };
+
     return (
         <div className="h-full flex flex-col gap-6">
             {/* Header Section */}
@@ -226,10 +300,17 @@ export function AdminPage() {
                     <p className="text-[10px] font-black text-slate-800 uppercase tracking-[0.3em] mt-2 opacity-60">Hệ thống quản lý chuyên sâu</p>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <button className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-800 text-slate-800 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:bg-slate-50 transition-all">
-                        <Settings size={16} strokeWidth={3} />
-                        Cài đặt hệ thống
+                <div className="flex items-center gap-4">
+                    <div className="flex flex-col items-end">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Tài khoản</span>
+                        <span className="text-xs font-black text-slate-800 tracking-tight">{userEmail || 'Admin'}</span>
+                    </div>
+                    <button
+                        onClick={handleLogout}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-rose-50 border border-rose-100 text-rose-500 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:bg-rose-100 hover:border-rose-200 transition-all group"
+                    >
+                        <LogOut size={16} strokeWidth={3} className="group-hover:translate-x-0.5 transition-transform" />
+                        Đăng xuất
                     </button>
                 </div>
             </div>
@@ -265,22 +346,174 @@ export function AdminPage() {
                 </div>
 
                 {/* Sub-Header with Search & Actions */}
-                <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-4">
-                        <div className="relative w-96 group">
+                <div className="flex items-center gap-4 mb-4">
+                    <div className="flex-1 flex items-center gap-3">
+                        <div className="relative flex-1 max-w-md group">
                             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-800 group-focus-within:text-secondary transition-colors">
                                 <Search size={18} strokeWidth={2.5} />
                             </div>
                             <input
                                 type="text"
-                                placeholder={activeTab === 'users' ? "Tìm kiếm người dùng..." : "Tìm kiếm mã hóa đơn, tên món, người đặt..."}
+                                placeholder={activeTab === 'users' ? "Tìm kiếm người dùng..." : "Tìm kiếm hóa đơn..."}
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="block w-full pl-12 pr-4 py-3 bg-white/40 border border-white/60 rounded-2xl focus:ring-2 focus:ring-secondary/20 focus:border-secondary/30 transition-all font-display text-sm font-bold text-slate-800 placeholder:text-slate-800/60"
                             />
                         </div>
 
-                        {activeTab === 'users' && (
+                        {activeTab === 'bills' && (
+                            <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-2 duration-500">
+
+
+                                {/* User Autocomplete Filter */}
+                                <div className="relative" ref={userSearchRef}>
+                                    <div className="flex items-center gap-3 bg-white/60 pl-4 pr-2 py-2 rounded-xl border border-white/80 group focus-within:border-secondary/40 focus-within:bg-white transition-all">
+                                        <UserIcon size={14} className="text-slate-400" />
+                                        <input
+                                            type="text"
+                                            value={userSearchInput}
+                                            onChange={(e) => {
+                                                setUserSearchInput(e.target.value);
+                                                setIsUserSuggestionsOpen(true);
+                                            }}
+                                            onFocus={() => setIsUserSuggestionsOpen(true)}
+                                            placeholder="Lọc người dùng..."
+                                            className="bg-transparent border-none font-black text-xs text-slate-900 focus:ring-0 outline-none w-32 placeholder:text-slate-400"
+                                        />
+                                    </div>
+
+                                    <AnimatePresence>
+                                        {isUserSuggestionsOpen && userSuggestions.length > 0 && (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                exit={{ opacity: 0, y: 5, scale: 0.95 }}
+                                                className="absolute top-full left-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden z-[110]"
+                                            >
+                                                <div className="max-h-64 overflow-y-auto custom-scrollbar p-2">
+                                                    {userSuggestions.map(u => (
+                                                        <button
+                                                            key={u.id}
+                                                            onClick={() => {
+                                                                setAdminUserFilter(u.tag_id);
+                                                                setUserSearchInput(u.tag_id === 'all' ? 'Tất cả' : u.tag_id);
+                                                                setIsUserSuggestionsOpen(false);
+                                                            }}
+                                                            className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-3 ${adminUserFilter === u.tag_id ? 'bg-secondary text-white' : 'hover:bg-slate-50 text-slate-700'}`}
+                                                        >
+                                                            <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${adminUserFilter === u.tag_id ? 'bg-white/20' : 'bg-slate-100'}`}>
+                                                                <UserIcon size={12} />
+                                                            </div>
+                                                            <div className="flex flex-col">
+                                                                <span>{u.tag_id === 'all' ? 'Tất cả' : `@${u.tag_id.replace('-runsystem.net', '')}`}</span>
+                                                                {u.user_name && u.tag_id !== 'all' && <span className={`text-[10px] opacity-70 ${adminUserFilter === u.tag_id ? 'text-white' : 'text-slate-500'}`}>{u.user_name}</span>}
+                                                            </div>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
+                                {/* Status Toggle */}
+                                <div className="flex bg-slate-100/50 rounded-[1.25rem] p-1 border border-white/80 shadow-inner backdrop-blur-md">
+                                    <button
+                                        onClick={() => setAdminStatusFilter('unpaid')}
+                                        className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${adminStatusFilter === 'unpaid' ? 'bg-white text-rose-500 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                                    >
+                                        Chưa thu
+                                    </button>
+                                    <button
+                                        onClick={() => setAdminStatusFilter('paid')}
+                                        className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${adminStatusFilter === 'paid' ? 'bg-white text-emerald-500 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                                    >
+                                        Đã thu
+                                    </button>
+                                </div>
+
+                                {/* Premium Date Picker Popup */}
+                                <div className="relative" ref={datePopupRef}>
+                                    <button
+                                        onClick={() => {
+                                            if (adminStatusFilter === 'paid') {
+                                                setIsDatePopupOpen(!isDatePopupOpen);
+                                            }
+                                        }}
+                                        disabled={adminStatusFilter === 'unpaid'}
+                                        className={`flex items-center gap-3 px-4 py-2 rounded-xl border transition-all ${adminStatusFilter === 'unpaid'
+                                            ? 'bg-slate-100/50 text-slate-400 border-transparent opacity-40 grayscale cursor-not-allowed'
+                                            : isDatePopupOpen
+                                                ? 'bg-slate-800 text-white border-slate-800 shadow-lg'
+                                                : 'bg-white/60 text-slate-900 border-white/80 hover:bg-white hover:border-secondary/30'
+                                            }`}
+                                    >
+                                        <Calendar size={14} className={adminStatusFilter === 'unpaid' ? 'text-slate-300' : isDatePopupOpen ? 'text-rose-400' : 'text-slate-400'} />
+                                        <span className="text-xs font-black uppercase tracking-widest whitespace-nowrap">
+                                            {adminStatusFilter === 'unpaid'
+                                                ? `${months[new Date().getMonth()].replace('Tháng ', 'T')}, ${new Date().getFullYear()}`
+                                                : `${months[adminMonthFilter].replace('Tháng ', 'T')}, ${adminYearFilter}`}
+                                        </span>
+                                        <span className={`material-icons text-lg transition-transform ${isDatePopupOpen ? 'rotate-180 opacity-50' : 'opacity-20'}`}>expand_more</span>
+                                    </button>
+
+                                    <AnimatePresence>
+                                        {isDatePopupOpen && (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: 15, scale: 0.95 }}
+                                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                                className="absolute right-0 top-full mt-2 w-72 bg-white rounded-[1.75rem] p-4 shadow-2xl border border-slate-100 z-[110]"
+                                            >
+                                                <div className="flex flex-col gap-5">
+                                                    {/* Year Selection */}
+                                                    <div className="flex items-center justify-between bg-slate-50 p-1 rounded-2xl border border-slate-100">
+                                                        <button
+                                                            onClick={() => setAdminYearFilter(adminYearFilter - 1)}
+                                                            className="w-9 h-9 flex items-center justify-center rounded-xl bg-white shadow-sm hover:text-rose-500 transition-all text-slate-500"
+                                                        >
+                                                            <ChevronLeft size={18} />
+                                                        </button>
+                                                        <div className="flex flex-col items-center">
+                                                            <span className="text-[8px] font-bold uppercase tracking-widest text-slate-400 leading-none mb-1">Năm</span>
+                                                            <span className="text-base font-black text-slate-800">{adminYearFilter}</span>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => setAdminYearFilter(adminYearFilter + 1)}
+                                                            className="w-9 h-9 flex items-center justify-center rounded-xl bg-white shadow-sm hover:text-rose-500 transition-all text-slate-500"
+                                                        >
+                                                            <ChevronRight size={18} />
+                                                        </button>
+                                                    </div>
+
+                                                    {/* Month Grid */}
+                                                    <div className="grid grid-cols-4 gap-2">
+                                                        {months.map((m, idx) => (
+                                                            <button
+                                                                key={m}
+                                                                onClick={() => {
+                                                                    setAdminMonthFilter(idx);
+                                                                    setIsDatePopupOpen(false);
+                                                                }}
+                                                                className={`py-2 px-1 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${adminMonthFilter === idx
+                                                                    ? 'bg-slate-800 text-white border-slate-800 shadow-lg'
+                                                                    : 'bg-white text-slate-600 border-slate-100 hover:border-slate-300 hover:bg-slate-50'
+                                                                    }`}
+                                                            >
+                                                                {m.replace('Tháng ', 'T')}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        {activeTab === 'users' ? (
                             <button
                                 onClick={() => {
                                     setEditingUser(null);
@@ -291,8 +524,7 @@ export function AdminPage() {
                                 <Plus size={16} strokeWidth={3} />
                                 Thêm người dùng
                             </button>
-                        )}
-                        {activeTab === 'bills' && (
+                        ) : (
                             <button
                                 onClick={() => {
                                     setEditingBill(null);
@@ -304,18 +536,15 @@ export function AdminPage() {
                                 Thêm hóa đơn
                             </button>
                         )}
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                        <span className="text-[10px] font-black text-slate-800 uppercase tracking-widest">
-                            {activeTab === 'users' ? `${filteredUsers.length} Người dùng` : `${filteredBills.length} Hóa đơn`}
+                        <span className="text-[10px] font-black text-slate-800 uppercase tracking-widest bg-white/40 px-3 py-3 rounded-2xl border border-white/60">
+                            {activeTab === 'users' ? `${filteredUsers.length} Users` : `${filteredBills.length} Bills`}
                         </span>
                     </div>
                 </div>
 
                 {/* Content Area */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
-                    <AnimatePresence mode="wait">
+                    <AnimatePresence>
                         {activeTab === 'users' ? (
                             isUsersLoading ? (
                                 <div className="h-full flex items-center justify-center">
@@ -400,6 +629,13 @@ export function AdminPage() {
                                                                     </button>
                                                                 </>
                                                             )}
+                                                            <button
+                                                                onClick={() => viewUserBills(u.tag_id)}
+                                                                className="w-9 h-9 rounded-xl glass flex items-center justify-center text-slate-500 hover:text-primary hover:bg-white hover:shadow-lg transition-all"
+                                                                title="Xem hóa đơn"
+                                                            >
+                                                                <FileText size={16} strokeWidth={2.5} />
+                                                            </button>
                                                             <button
                                                                 onClick={() => {
                                                                     setEditingUser(u);

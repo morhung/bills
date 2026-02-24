@@ -161,21 +161,16 @@ function App() {
 
                     <Route path="/admin" element={
                         session ? (
-                            <div className="flex-1 flex flex-col overflow-hidden">
-                                <div className="flex-none bg-white/70 backdrop-blur-3xl border-b border-white/40 shadow-xl shadow-black/5 z-[60]">
-                                    <Header userName={session?.user?.email?.split('@')[0] || 'Admin'} />
-                                </div>
-                                <main className="flex-1 flex overflow-hidden max-w-7xl mx-auto w-full px-4 gap-8 py-4 items-stretch relative overflow-hidden">
-                                    <motion.div
-                                        initial={{ opacity: 0, x: 20 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        exit={{ opacity: 0, x: -20 }}
-                                        className="flex-1 flex flex-col h-full overflow-hidden"
-                                    >
-                                        <AdminPage />
-                                    </motion.div>
-                                </main>
-                            </div>
+                            <main className="flex-1 flex overflow-hidden max-w-7xl mx-auto w-full px-4 gap-8 py-8 items-stretch relative overflow-hidden">
+                                <motion.div
+                                    initial={{ opacity: 0, x: 20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: -20 }}
+                                    className="flex-1 flex flex-col h-full overflow-hidden"
+                                >
+                                    <AdminPage userEmail={session?.user?.email} />
+                                </motion.div>
+                            </main>
                         ) : (
                             <Navigate to="/login" replace />
                         )

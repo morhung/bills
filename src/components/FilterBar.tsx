@@ -39,7 +39,7 @@ export function FilterBar({ status, setStatus, month, setMonth, year, setYear }:
                     <div className="flex items-center gap-2">
                         <span className="material-icons text-primary text-lg drop-shadow-sm">history_edu</span>
                         <h2 className="text-xl font-black text-slate-900 font-display tracking-tight uppercase italic leading-none">
-                            Lịch sử chi tiêu
+                            Lịch sử order
                         </h2>
                     </div>
                 </div>
@@ -101,8 +101,8 @@ export function FilterBar({ status, setStatus, month, setMonth, year, setYear }:
                                     : `${months[month]}, ${year}`}
                             </span>
                             <span className={`material-icons text-lg transition-transform duration-300 ${status === 'unpaid'
-                                    ? 'text-slate-300 opacity-40'
-                                    : isPopupOpen ? 'rotate-180 text-white/50' : 'text-slate-300 group-hover/btn:text-slate-400'
+                                ? 'text-slate-300 opacity-40'
+                                : isPopupOpen ? 'rotate-180 text-white/50' : 'text-slate-300 group-hover/btn:text-slate-400'
                                 }`}>expand_more</span>
                         </button>
 
