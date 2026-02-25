@@ -11,6 +11,7 @@ interface BillCardProps {
 
 function BillCard({ bill }: BillCardProps) {
     const [isExpanded, setIsExpanded] = useState(false);
+    const isNegative = bill.total_amount < 0;
 
     return (
         <motion.div
@@ -24,12 +25,12 @@ function BillCard({ bill }: BillCardProps) {
             >
                 {/* Left side: Date & Time */}
                 <div className="flex items-center gap-4 lg:gap-5 flex-1">
-                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-500 shrink-0 ${bill.is_paid
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-500 shrink-0 ${isNegative || bill.is_paid
                         ? 'bg-emerald-50 text-emerald-600'
                         : 'bg-rose-50 text-rose-500'
                         }`}>
                         <span className="material-icons text-2xl">
-                            {bill.is_paid ? 'task_alt' : 'receipt_long'}
+                            {isNegative ? 'savings' : bill.is_paid ? 'task_alt' : 'receipt_long'}
                         </span>
                     </div>
 
@@ -38,7 +39,7 @@ function BillCard({ bill }: BillCardProps) {
                             {format(new Date(bill.bill_date), 'dd/MM/yyyy')}
                         </span>
                         <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-                            <span className={`w-1.5 h-1.5 rounded-full ${bill.is_paid ? 'bg-emerald-400' : 'bg-rose-400'}`}></span>
+                            <span className={`w-1.5 h-1.5 rounded-full ${isNegative || bill.is_paid ? 'bg-emerald-400' : 'bg-rose-400'}`}></span>
                             {format(new Date(bill.bill_date), 'EEEE', { locale: vi })}
                         </span>
                     </div>
@@ -47,8 +48,8 @@ function BillCard({ bill }: BillCardProps) {
                 {/* Right side: Amount, Badge & Chevron */}
                 <div className="flex items-center gap-4 lg:gap-6">
                     <div className="flex flex-col items-end gap-1.5">
-                        <div className={`flex items-baseline gap-1 ${bill.total_amount < 0
-                            ? 'text-orange-500'
+                        <div className={`flex items-baseline gap-1 ${isNegative
+                            ? 'text-emerald-600'
                             : !bill.is_paid
                                 ? 'text-rose-600'
                                 : 'text-emerald-600'
@@ -60,12 +61,12 @@ function BillCard({ bill }: BillCardProps) {
                         </div>
 
                         {/* Explicit Badge */}
-                        <div className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 border ${bill.is_paid
+                        <div className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 border ${isNegative || bill.is_paid
                             ? 'bg-emerald-50 text-emerald-600 border-emerald-200/50'
                             : 'bg-rose-50 text-rose-600 border-rose-200/50'
                             }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${bill.is_paid ? 'bg-emerald-500' : 'bg-rose-500 animate-pulse'}`}></span>
-                            {bill.is_paid ? 'Đã thu' : 'Chưa thu'}
+                            <span className={`w-1.5 h-1.5 rounded-full ${isNegative || bill.is_paid ? 'bg-emerald-500' : 'bg-rose-500 animate-pulse'}`}></span>
+                            {isNegative ? 'Hoàn dư' : bill.is_paid ? 'Đã thu' : 'Chưa thu'}
                         </div>
                     </div>
 
