@@ -42,6 +42,8 @@ export type DetailedBill = Bill & {
 export type ViewBill = {
     id: string;
     bill_date: string;
+    user_id: string;
+    user_name: string;
     tag_id: string;
     total_amount: number;
     is_paid: boolean;

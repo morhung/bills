@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, FileText, Shield, Trash2, Edit3, Plus, Loader2, Bell, CreditCard, ChevronLeft, ChevronRight, Calendar, User as UserIcon, LogOut } from 'lucide-react';
+import { Search, FileText, Shield, Trash2, Edit3, Plus, Loader2, Bell, CreditCard, ChevronLeft, ChevronRight, Calendar, User as UserIcon, LogOut, ChevronDown } from 'lucide-react';
 import type { DetailedBill, BillItem, User } from '../types/database';
 import React from 'react'; // Added React import for React.Fragment
 import { AddBillPopup } from './AddBillPopup';
@@ -12,6 +12,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { billService } from '../services/billService';
 import { chatopsService } from '../services/chatopsService';
 import { removeAccents } from '../utils/stringUtils';
+import { generateVietQRString, generateVietQRVIBString } from '../services/vietQRService';
 
 export function AdminPage({ userEmail }: { userEmail?: string }) {
     const queryClient = useQueryClient();
@@ -51,6 +52,7 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
     const [isAddUserOpen, setIsAddUserOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [editingBill, setEditingBill] = useState<DetailedBill | null>(null);
+    const [isNotifyingAll, setIsNotifyingAll] = useState(false);
 
     const viewUserBills = (tagId: string) => {
         setAdminUserFilter(tagId);
@@ -213,18 +215,26 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
         }
     };
 
-    const handleNotifyUser = async (user: User) => {
-        if (!user.total_unpaid || user.total_unpaid <= 0) return;
+    const handleNotifyUser = async (user: User, silent: boolean = false) => {
+        if (!user.total_unpaid || user.total_unpaid <= 0) return false;
 
-        const message = `🔔 Nhắc nợ: @${user.tag_id} ơi, bạn hiện đang có khoản nợ nước tổng cộng là **${user.total_unpaid.toLocaleString('vi-VN')}đ**. Vui lòng thanh toán giúp mình nhé! 🙏`;
+        const qrMoMo = generateVietQRString(user.total_unpaid);
+        const qrVib = generateVietQRVIBString(user.total_unpaid);
+
+        const message = `:emo_flower: Hi @${user.tag_id},
+
+ :pepesaber: Dư nợ tiền nước tuần này của bạn là: ${user.total_unpaid.toLocaleString('vi-VN')} VND :money_mouth_face: :money_mouth_face: :money_mouth_face: 
+
+ :point_right: Chi tiết xem [tại đây](https://drill-bill.vercel.app/${user.tag_id.replace('-runsystem.net', '')}) 
+
+ :momo: Scan QR code bên dưới để chuyển cho HùngND. 
+
+ ![image](${qrMoMo}) ![image](${qrVib})`;
 
         try {
-            let success = false;
-
             const targetChannel = user.chatops_channel_id || "3it5zuqw3bnk3bwkspuyhsotce";
             const postId = await chatopsService.postMessage(message, targetChannel);
             if (postId) {
-                success = true;
                 const { error: updateError } = await supabase
                     .from('users')
                     .update({ last_post_id: postId })
@@ -232,20 +242,49 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
 
                 if (updateError) console.error('Error saving last_post_id:', updateError);
 
-                // Invalidate users query to refresh last_post_id in UI state
-                queryClient.invalidateQueries({ queryKey: ['users'] });
+                if (!silent) {
+                    alert('Đã gửi thông báo nhắc nợ thành công!');
+                    queryClient.invalidateQueries({ queryKey: ['users'] });
+                }
+                return true;
             }
-
-            if (success) {
-                alert(`Đã gửi thông báo nhắc nợ đến @${user.tag_id} thành công!`);
-            } else {
-                alert('Không thể gửi thông báo. Vui lòng kiểm tra lại cấu hình ChatOps.');
-            }
-        } catch (error) {
-            console.error('Failed to notify user:', error);
-            alert('Lỗi khi gửi thông báo.');
+            return false;
+        } catch (error: any) {
+            console.error('Error notifying user:', error);
+            if (!silent) alert('Lỗi: ' + error.message);
+            return false;
         }
     };
+
+    const handleNotifyAll = async () => {
+        const usersWithDebt = users?.filter(u => u.total_unpaid && u.total_unpaid > 0) || [];
+
+        if (usersWithDebt.length === 0) {
+            alert('Không có người dùng nào đang nợ tiền.');
+            return;
+        }
+
+        if (!confirm(`Bạn có chắc muốn gửi thông báo nhắc nợ cho ${usersWithDebt.length} người dùng?`)) return;
+
+        setIsNotifyingAll(true);
+        let successCount = 0;
+
+        try {
+            for (const user of usersWithDebt) {
+                const success = await handleNotifyUser(user, true);
+                if (success) successCount++;
+            }
+
+            alert(`Đã gửi thông báo cho ${successCount}/${usersWithDebt.length} người dùng.`);
+            queryClient.invalidateQueries({ queryKey: ['users'] });
+        } catch (error: any) {
+            console.error('Error notifying all users:', error);
+            alert('Có lỗi xảy ra trong quá trình gửi thông báo hàng loạt.');
+        } finally {
+            setIsNotifyingAll(false);
+        }
+    };
+
 
     const handlePayUserBills = async (user: User) => {
         if (!confirm(`Bạn có chắc muốn đánh dấu TẤT CẢ hóa đơn của "${user.user_name}" (Tổng: ${user.total_unpaid?.toLocaleString('vi-VN')}đ) là ĐÃ THANH TOÁN?`)) return;
@@ -367,46 +406,68 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
 
                                 {/* User Autocomplete Filter */}
                                 <div className="relative" ref={userSearchRef}>
-                                    <div className="flex items-center gap-3 bg-white/60 pl-4 pr-2 py-2 rounded-xl border border-white/80 group focus-within:border-secondary/40 focus-within:bg-white transition-all">
-                                        <UserIcon size={14} className="text-slate-400" />
-                                        <input
-                                            type="text"
-                                            value={userSearchInput}
-                                            onChange={(e) => {
-                                                setUserSearchInput(e.target.value);
-                                                setIsUserSuggestionsOpen(true);
-                                            }}
-                                            onFocus={() => setIsUserSuggestionsOpen(true)}
-                                            placeholder="Lọc người dùng..."
-                                            className="bg-transparent border-none font-black text-xs text-slate-900 focus:ring-0 outline-none w-32 placeholder:text-slate-400"
-                                        />
+                                    <div
+                                        onClick={() => setIsUserSuggestionsOpen(!isUserSuggestionsOpen)}
+                                        className="flex items-center gap-3 bg-white/60 pl-4 pr-10 py-2 rounded-xl border border-white/80 group focus-within:border-secondary/40 focus-within:bg-white transition-all cursor-pointer relative"
+                                    >
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-secondary transition-colors">
+                                            <UserIcon size={14} />
+                                        </div>
+                                        <span className={`font-black text-xs transition-colors ${adminUserFilter === 'all' ? 'text-slate-400' : 'text-slate-900'}`}>
+                                            {adminUserFilter === 'all'
+                                                ? 'Tất cả người dùng'
+                                                : (users?.find(u => u.tag_id === adminUserFilter)?.user_name || `@${adminUserFilter.replace('-runsystem.net', '')}`)}
+                                        </span>
+                                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition-transform duration-300">
+                                            <ChevronDown size={14} className={isUserSuggestionsOpen ? 'rotate-180' : ''} />
+                                        </div>
                                     </div>
 
                                     <AnimatePresence>
-                                        {isUserSuggestionsOpen && userSuggestions.length > 0 && (
+                                        {isUserSuggestionsOpen && (
                                             <motion.div
                                                 initial={{ opacity: 0, y: 10, scale: 0.95 }}
                                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                                 exit={{ opacity: 0, y: 5, scale: 0.95 }}
                                                 className="absolute top-full left-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden z-[110]"
                                             >
+                                                <div className="p-2 border-b border-slate-50 bg-slate-50/50 flex items-center gap-2">
+                                                    <Search size={12} className="text-slate-400" />
+                                                    <input
+                                                        autoFocus
+                                                        type="text"
+                                                        value={userSearchInput}
+                                                        onChange={(e) => setUserSearchInput(e.target.value)}
+                                                        placeholder="Tìm người dùng..."
+                                                        className="bg-transparent border-none font-bold text-[11px] text-slate-700 focus:ring-0 outline-none w-full p-0 placeholder:text-slate-400"
+                                                    />
+                                                </div>
                                                 <div className="max-h-64 overflow-y-auto custom-scrollbar p-2">
                                                     {userSuggestions.map(u => (
                                                         <button
                                                             key={u.id}
-                                                            onClick={() => {
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
                                                                 setAdminUserFilter(u.tag_id);
-                                                                setUserSearchInput(u.tag_id === 'all' ? 'Tất cả' : u.tag_id);
+                                                                setUserSearchInput('');
                                                                 setIsUserSuggestionsOpen(false);
                                                             }}
                                                             className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-3 ${adminUserFilter === u.tag_id ? 'bg-secondary text-white' : 'hover:bg-slate-50 text-slate-700'}`}
                                                         >
-                                                            <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${adminUserFilter === u.tag_id ? 'bg-white/20' : 'bg-slate-100'}`}>
-                                                                <UserIcon size={12} />
+                                                            <div className={`w-6 h-6 rounded-lg flex items-center justify-center overflow-hidden ${adminUserFilter === u.tag_id ? 'bg-white/20' : 'bg-slate-100'}`}>
+                                                                {u.avatar_url ? (
+                                                                    <img src={u.avatar_url} className="w-full h-full object-cover" alt="" />
+                                                                ) : (
+                                                                    <UserIcon size={12} />
+                                                                )}
                                                             </div>
                                                             <div className="flex flex-col">
-                                                                <span>{u.tag_id === 'all' ? 'Tất cả' : `@${u.tag_id.replace('-runsystem.net', '')}`}</span>
-                                                                {u.user_name && u.tag_id !== 'all' && <span className={`text-[10px] opacity-70 ${adminUserFilter === u.tag_id ? 'text-white' : 'text-slate-500'}`}>{u.user_name}</span>}
+                                                                <span className="leading-tight">{u.tag_id === 'all' ? 'Tất cả người dùng' : u.user_name || `@${u.tag_id.replace('-runsystem.net', '')}`}</span>
+                                                                {u.tag_id !== 'all' && u.user_name && (
+                                                                    <span className={`text-[9px] opacity-70 leading-tight ${adminUserFilter === u.tag_id ? 'text-white' : 'text-slate-500'}`}>
+                                                                        @{u.tag_id.replace('-runsystem.net', '')}
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                         </button>
                                                     ))}
@@ -514,16 +575,26 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
 
                     <div className="flex items-center gap-3">
                         {activeTab === 'users' ? (
-                            <button
-                                onClick={() => {
-                                    setEditingUser(null);
-                                    setIsAddUserOpen(true);
-                                }}
-                                className="flex items-center gap-2 px-5 py-3 bg-gradient-to-br from-secondary to-primary text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-secondary/20 hover:scale-105 transition-all"
-                            >
-                                <Plus size={16} strokeWidth={3} />
-                                Thêm người dùng
-                            </button>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={handleNotifyAll}
+                                    disabled={isNotifyingAll}
+                                    className="flex items-center gap-2 px-5 py-3 bg-white text-slate-800 border border-slate-200 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:shadow-xl hover:border-slate-300 transition-all disabled:opacity-50"
+                                >
+                                    {isNotifyingAll ? <Loader2 size={16} className="animate-spin" /> : <Bell size={16} />}
+                                    Nhắc tất cả
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setEditingUser(null);
+                                        setIsAddUserOpen(true);
+                                    }}
+                                    className="flex items-center gap-2 px-5 py-3 bg-gradient-to-br from-secondary to-primary text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-secondary/20 hover:scale-105 transition-all"
+                                >
+                                    <Plus size={16} strokeWidth={3} />
+                                    Thêm người dùng
+                                </button>
+                            </div>
                         ) : (
                             <button
                                 onClick={() => {
@@ -590,7 +661,7 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                                                     </td>
                                                     <td className="px-6 py-5">
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-[11px] font-black text-slate-800 font-mono tracking-tight uppercase tabular-nums bg-slate-100 px-2 py-1 rounded-lg">@{u.tag_id.replace('-runsystem.net', '')}</span>
+                                                            <span className="text-[11px] font-black text-slate-800 font-mono tracking-tight tabular-nums bg-slate-100 px-2 py-1 rounded-lg">{u.tag_id}</span>
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-5 text-right">

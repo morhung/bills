@@ -51,13 +51,13 @@ export const billService = {
             bill_date: viewBill.bill_date,
             total_amount: viewBill.total_amount,
             is_paid: viewBill.is_paid,
-            user_id: viewBill.tag_id, // Map tag_id to user_id for compatibility
+            user_id: viewBill.user_id, // Now uses actual UUID from view
             created_at: '', // Not in view
             bill_items: viewBill.items || [], // Map items to bill_items
             users: {
-                id: viewBill.tag_id,
+                id: viewBill.user_id,
                 tag_id: viewBill.tag_id,
-                user_name: viewBill.tag_id, // Use tag_id as name if missing in view
+                user_name: viewBill.user_name, // Now uses actual name from view
                 chatops_channel_id: '',
                 role: 0,
                 email: '',

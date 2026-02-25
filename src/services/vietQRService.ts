@@ -1,4 +1,4 @@
-import { QRPay } from 'vietnam-qr-pay';
+import { QRPay, BanksObject } from 'vietnam-qr-pay';
 
 /**
  * Generates a VietQR string for banking apps to scan
@@ -14,6 +14,25 @@ export function generateVietQRString(amount: number): string {
         const content = qrPay.build();
         const encodedContent = encodeURIComponent(content);
         const qrLink = `https://quickchart.io/qr?centerImageUrl=https://lh3.googleusercontent.com/pw/AP1GczNMvTVT6c3_6QJgMHGLNEpTLvPRa3gfDdNg7t-mRaNrNAa0k9jmfowAhCFeSyEz_5ZO71rdA8YdAfMsbcd_KoOvURyrc5piAqvWS3Z5rxWGU0fYXUuFVis_s0ZKPuzQHM_EujAZZg6GU4ol63ce2Ws=w800-h800-s-no&size=200&text=${encodedContent}`;
+        return qrLink;
+    } catch (error) {
+        console.error('Error generating VietQR string:', error);
+        return '';
+    }
+}
+
+export function generateVietQRVIBString(amount: number): string {
+    try {
+        const qrPay = QRPay.initVietQR({
+            bankBin: BanksObject.vib.bin,
+            bankNumber: import.meta.env.VITE_VIB_BANK_NUMBER || '',
+            amount: amount.toString(),
+        })
+
+        const content = qrPay.build()
+
+        const encodedContent = encodeURIComponent(content);
+        const qrLink = `https://quickchart.io/qr?centerImageUrl=https://www.sgbank.vn/wp-content/uploads/2022/03/VIB-logo-200x200-28.png&size=200&text=${encodedContent}`;
         return qrLink;
     } catch (error) {
         console.error('Error generating VietQR string:', error);

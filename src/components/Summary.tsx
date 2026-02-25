@@ -132,7 +132,7 @@ export function Summary({ totalDebt, qrLink, loading }: SummaryProps) {
                         </div>
 
                         <div className="w-full max-w-[200px]">
-                            <div className="aspect-square rounded-[2rem] bg-white p-3 shadow-xl relative overflow-hidden w-full border border-indigo-100">
+                            <div className="aspect-square rounded-[0rem] bg-white p-0 shadow-xl relative overflow-hidden w-full border border-indigo-100">
                                 <img
                                     src={qrLink}
                                     alt="VietQR"
