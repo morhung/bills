@@ -73,7 +73,7 @@ const MainView = ({ session }: { session: Session | null }) => {
     return (
         <div className="flex-1 flex flex-col overflow-hidden">
             <div className="flex-none bg-white/70 backdrop-blur-3xl border-b border-white/40 shadow-xl shadow-black/5 z-[60]">
-                <Header userName={displayUserName} />
+                <Header userName={displayUserName} loading={isLoading} />
             </div>
 
             <main className="flex-1 flex overflow-hidden max-w-7xl mx-auto w-full px-4 gap-8 py-4 items-stretch relative">
@@ -84,7 +84,7 @@ const MainView = ({ session }: { session: Session | null }) => {
                     className="flex-1 flex overflow-hidden gap-8"
                 >
                     <aside className="hidden lg:flex flex-col w-[320px] flex-none">
-                        <Summary totalDebt={totalDebt} qrLink={qrLink} />
+                        <Summary totalDebt={totalDebt} qrLink={qrLink} loading={isLoading} />
                     </aside>
 
                     <div className="flex-1 flex flex-col min-w-0 h-full">
@@ -100,18 +100,14 @@ const MainView = ({ session }: { session: Session | null }) => {
                         </div>
 
                         <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-                            {isLoading ? (
-                                <div className="h-full flex items-center justify-center">
-                                    <Loader2 className="animate-spin text-primary/60" size={48} strokeWidth={3} />
-                                </div>
-                            ) : error ? (
+                            {error ? (
                                 <div className="py-24 text-center border border-primary/10 rounded-xl p-12 bg-white">
                                     <p className="text-red-500 font-bold text-lg">Đã có lỗi xảy ra khi tải dữ liệu.</p>
                                     <p className="text-sm text-slate-800 mt-2 font-black uppercase tracking-widest">Vui lòng thử lại sau.</p>
                                 </div>
                             ) : (
                                 <div className="pb-8">
-                                    <BillList bills={bills || []} />
+                                    <BillList bills={bills || []} loading={isLoading} />
                                 </div>
                             )}
                         </div>

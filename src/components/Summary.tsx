@@ -1,9 +1,47 @@
+import { Skeleton } from './Skeleton';
+
 interface SummaryProps {
     totalDebt: number;
     qrLink?: string;
+    loading?: boolean;
 }
 
-export function Summary({ totalDebt, qrLink }: SummaryProps) {
+export function Summary({ totalDebt, qrLink, loading }: SummaryProps) {
+    if (loading) {
+        return (
+            <div className="flex flex-col gap-6 w-full">
+                {/* Unpaid Card Skeleton */}
+                <div className="glass-card relative overflow-hidden rounded-[2.5rem] bg-white/60">
+                    <div className="relative p-6 lg:p-7 flex flex-col h-full z-10">
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center gap-2.5">
+                                <Skeleton variant="circle" className="w-10 h-10 rounded-2xl" />
+                                <Skeleton className="h-4 w-24" />
+                            </div>
+                        </div>
+                        <div className="flex flex-col mt-auto">
+                            <Skeleton className="h-12 w-40" />
+                        </div>
+                    </div>
+                </div>
+
+                {/* QR Card Skeleton */}
+                <div className="glass-card relative overflow-hidden rounded-[2.5rem] bg-white/60">
+                    <div className="relative p-6 lg:p-8 flex flex-col items-center justify-center text-center z-10 w-full">
+                        <div className="flex items-center gap-2 mb-6">
+                            <Skeleton variant="circle" className="w-8 h-8 rounded-xl" />
+                            <Skeleton className="h-4 w-28" />
+                        </div>
+                        <div className="w-full max-w-[200px]">
+                            <Skeleton className="aspect-square rounded-[2rem]" />
+                        </div>
+                        <Skeleton className="h-3 w-32 mt-5" />
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="flex flex-col gap-6 w-full">
             {/* Unpaid Card (Coral/Red theme) */}

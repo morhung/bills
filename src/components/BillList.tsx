@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { DetailedBill, BillItem } from '../types/database';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import { Skeleton } from './Skeleton';
 
 interface BillCardProps {
     bill: DetailedBill;
@@ -128,7 +129,40 @@ function BillCard({ bill }: BillCardProps) {
     );
 }
 
-export function BillList({ bills }: { bills: DetailedBill[] }) {
+function BillSkeleton() {
+    return (
+        <div className="flex flex-col mb-2 overflow-hidden rounded-[2rem] border border-slate-100 bg-white/60">
+            <div className="p-3 lg:p-3 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4 lg:gap-5 flex-1">
+                    <Skeleton variant="circle" className="w-14 h-14 rounded-2xl" />
+                    <div className="flex flex-col gap-2">
+                        <Skeleton className="h-5 w-32" />
+                        <Skeleton className="h-3 w-20" />
+                    </div>
+                </div>
+                <div className="flex items-center gap-4 lg:gap-6">
+                    <div className="flex flex-col items-end gap-2">
+                        <Skeleton className="h-6 w-24" />
+                        <Skeleton className="h-4 w-16 rounded-lg" />
+                    </div>
+                    <Skeleton variant="circle" className="w-10 h-10 hidden sm:flex" />
+                </div>
+            </div>
+        </div>
+    );
+}
+
+export function BillList({ bills, loading }: { bills: DetailedBill[]; loading?: boolean }) {
+    if (loading) {
+        return (
+            <div className="flex flex-col gap-2 pb-12 w-full">
+                <BillSkeleton />
+                <BillSkeleton />
+                <BillSkeleton />
+            </div>
+        );
+    }
+
     if (!bills || bills.length === 0) {
         return (
             <div className="py-24 bg-white/40 border border-white/60 rounded-[3rem] shadow-sm flex flex-col items-center text-center px-6 relative overflow-hidden group">
