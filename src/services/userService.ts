@@ -8,7 +8,7 @@ export const userService = {
      */
     async getUsers(): Promise<User[]> {
         const { data, error } = await supabase
-            .from('users')
+            .from('getUsers')
             .select('*')
             .order('user_name', { ascending: true });
 
@@ -32,8 +32,8 @@ export const userService = {
 
         // Only request columns needed by MainView to minimize payload size
         const { data, error } = await supabase
-            .from('users')
-            .select('id, tag_id, user_name')
+            .from('getUsers')
+            .select('id, tag_id, user_name, gender')
             .eq('tag_id', fullTagId)
             .single();
 

@@ -7,6 +7,7 @@ export type User = {
     email: string;
     avatar_url: string | null;
     last_post_id?: string | null;
+    gender?: number;
     total_unpaid?: number;
     total_paid?: number;
 };

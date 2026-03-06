@@ -17,6 +17,7 @@ export function AddUserPopup({ isOpen, onClose, onSave, initialData }: AddUserPo
     const [userName, setUserName] = useState('');
     const [email, setEmail] = useState('');
     const [role, setRole] = useState(0); // 0: Member, 1: Admin, etc.
+    const [gender, setGender] = useState(0); // 0: None, 1: Female, 2: Male
     const [isSaving, setIsSaving] = useState(false);
 
     // ChatOps search state
@@ -31,6 +32,7 @@ export function AddUserPopup({ isOpen, onClose, onSave, initialData }: AddUserPo
             setUserName(initialData.user_name || '');
             setEmail(initialData.email || '');
             setRole(initialData.role || 0);
+            setGender(initialData.gender || 0);
         } else if (!isOpen) {
             // Reset when closed
             setTagId('');
@@ -38,6 +40,7 @@ export function AddUserPopup({ isOpen, onClose, onSave, initialData }: AddUserPo
             setUserName('');
             setEmail('');
             setRole(0);
+            setGender(0);
             setSuggestions([]);
             setShowSuggestions(false);
         }
@@ -95,7 +98,8 @@ export function AddUserPopup({ isOpen, onClose, onSave, initialData }: AddUserPo
                 chatops_channel_id: chatopsId,
                 user_name: userName,
                 email: email,
-                role: role
+                role: role,
+                gender: gender
             });
 
             // If onSave doesn't throw, assume success
@@ -105,6 +109,7 @@ export function AddUserPopup({ isOpen, onClose, onSave, initialData }: AddUserPo
             setUserName('');
             setEmail('');
             setRole(0);
+            setGender(0);
             onClose();
         } catch (error) {
             // Error is handled in AdminPage but we catch here to stop loading
@@ -301,6 +306,24 @@ export function AddUserPopup({ isOpen, onClose, onSave, initialData }: AddUserPo
                                         <option value={0}>Thành viên (Member)</option>
                                         <option value={1}>Quản trị viên (Admin)</option>
                                         <option value={2}>Hệ thống (System)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Gender Selection */}
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Giới tính</label>
+                                <div className="relative group">
+                                    <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-secondary transition-all" size={18} />
+                                    <select
+                                        value={gender}
+                                        onChange={(e) => setGender(parseInt(e.target.value))}
+                                        className="w-full pl-12 pr-4 py-3 bg-white/40 border border-white/60 rounded-2xl focus:ring-2 focus:ring-secondary/20 focus:border-secondary/30 transition-all font-display text-sm font-bold text-slate-800 appearance-none cursor-pointer"
+                                    >
+                                        <option value={0}>Nam</option>
+                                        <option value={1}>Nữ</option>
+                                        <option value={2}>Anh</option>
+                                        <option value={3}>Chị</option>
                                     </select>
                                 </div>
                             </div>

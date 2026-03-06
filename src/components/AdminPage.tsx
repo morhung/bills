@@ -164,7 +164,8 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                         chatops_channel_id: userData.chatops_channel_id,
                         user_name: userData.user_name,
                         email: userData.email,
-                        role: userData.role
+                        role: userData.role,
+                        gender: userData.gender
                     })
                     .eq('id', userData.id);
 
@@ -180,7 +181,8 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                         chatops_channel_id: userData.chatops_channel_id,
                         user_name: userData.user_name,
                         email: userData.email,
-                        role: userData.role
+                        role: userData.role,
+                        gender: userData.gender
                     }]);
 
                 if (userError) throw userError;
@@ -221,11 +223,12 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
         const qrMoMo = generateVietQRString(user.total_unpaid);
         const qrVib = generateVietQRVIBString(user.total_unpaid);
 
-        const message = `:emo_flower: Hi @${user.tag_id},
+        const prefix = user.gender === 2 ? 'anh ' : user.gender === 3 ? 'chị ' : '';
+        const message = `:emo_flower: Hi ${prefix}@${user.tag_id},
 
- :pepesaber: Dư nợ tiền nước tuần này của bạn là: ${user.total_unpaid.toLocaleString('vi-VN')} VND :money_mouth_face: :money_mouth_face: :money_mouth_face: 
+ :pepesaber: Dư nợ tuần này là: ${user.total_unpaid.toLocaleString('vi-VN')} VND :money_mouth_face: :money_mouth_face: :money_mouth_face: 
 
- :point_right: Chi tiết xem [tại đây](https://drill-bill.vercel.app/${user.tag_id.replace('-runsystem.net', '')}) 
+ :point_right: Chi tiết xem [tại đây](https://drink-bill.vercel.app/${user.tag_id.replace('-runsystem.net', '')}) 
 
  :momo: Scan QR code bên dưới để chuyển cho HùngND. 
 

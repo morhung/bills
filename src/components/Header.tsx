@@ -28,7 +28,7 @@ export function Header({ userName, loading }: HeaderProps) {
                                 <Skeleton className="h-6 w-32 mt-1" />
                             </div>
                         ) : (
-                            <h1 className="text-xl font-black tracking-tighter text-slate-900 font-display italic text-shadow-sm">
+                            <h1 className="text-xl font-black tracking-tighter text-slate-900 font-display italic text-shadow-sm pr-4 whitespace-nowrap">
                                 Xin chào, {userName}
                             </h1>
                         )}
