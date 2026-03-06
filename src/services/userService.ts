@@ -18,5 +18,34 @@ export const userService = {
         }
 
         return data as User[];
+    },
+
+    /**
+     * Fetch a single user by tag_id.
+     * Efficient query to check if a user route is valid without loading all users.
+     */
+    async getUserByTagId(tagId: string): Promise<User | null> {
+        if (!tagId) return null;
+
+        const cleanTagId = tagId.toLowerCase().replace('-runsystem.net', '');
+        const fullTagId = `${cleanTagId}-runsystem.net`;
+
+        // Only request columns needed by MainView to minimize payload size
+        const { data, error } = await supabase
+            .from('users')
+            .select('id, tag_id, user_name')
+            .eq('tag_id', fullTagId)
+            .single();
+
+        if (error) {
+            if (error.code === 'PGRST116') {
+                // PGRST116 means zero rows returned from .single()
+                return null;
+            }
+            console.error('Error fetching user by tag ID:', error);
+            throw error;
+        }
+
+        return data as User;
     }
 };

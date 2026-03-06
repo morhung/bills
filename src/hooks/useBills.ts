@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { billService } from '../services/billService';
 import type { BillFilters } from '../services/billService';
 
-export function useBills(filters?: BillFilters) {
+export function useBills(filters?: BillFilters, enabled: boolean = true) {
     const queryClient = useQueryClient();
 
     const { data: bills, isLoading, error } = useQuery({
@@ -16,7 +16,8 @@ export function useBills(filters?: BillFilters) {
                 console.error('Failed to fetch bills:', err);
                 throw err;
             }
-        }
+        },
+        enabled: enabled
     });
 
     useEffect(() => {

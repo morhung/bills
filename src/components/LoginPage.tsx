@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Lock, Loader2, ArrowRight, User } from 'lucide-react';
+import { Mail, Lock, ArrowRight, User } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 
@@ -120,12 +120,24 @@ export function LoginPage() {
                         >
                             <AnimatePresence mode="wait">
                                 {isLoading ? (
-                                    <Loader2 className="animate-spin" size={20} strokeWidth={3} />
+                                    <motion.span
+                                        key="loading"
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: [0.4, 1, 0.4] }}
+                                        transition={{ duration: 1.5, repeat: Infinity }}
+                                    >
+                                        Đang xử lý...
+                                    </motion.span>
                                 ) : (
-                                    <>
+                                    <motion.div
+                                        key="idle"
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        className="flex items-center gap-2"
+                                    >
                                         <span>Đăng Nhập</span>
                                         <ArrowRight size={18} strokeWidth={3} className="group-hover:translate-x-1 transition-transform" />
-                                    </>
+                                    </motion.div>
                                 )}
                             </AnimatePresence>
                         </button>

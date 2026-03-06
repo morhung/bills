@@ -3,14 +3,15 @@ import { useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { userService } from '../services/userService';
 
-export function useUsers() {
+export function useUsers(enabled: boolean = true) {
     const queryClient = useQueryClient();
 
     const { data: users, isLoading, error } = useQuery({
         queryKey: ['users'],
         queryFn: async () => {
             return await userService.getUsers();
-        }
+        },
+        enabled: enabled
     });
 
     useEffect(() => {

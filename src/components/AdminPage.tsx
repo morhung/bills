@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, FileText, Shield, Trash2, Edit3, Plus, Loader2, Bell, CreditCard, ChevronLeft, ChevronRight, Calendar, User as UserIcon, LogOut, ChevronDown } from 'lucide-react';
+import { Search, FileText, Shield, Trash2, Edit3, Plus, Bell, CreditCard, ChevronLeft, ChevronRight, Calendar, User as UserIcon, LogOut, ChevronDown } from 'lucide-react';
 import type { DetailedBill, BillItem, User } from '../types/database';
 import React from 'react'; // Added React import for React.Fragment
 import { AddBillPopup } from './AddBillPopup';
@@ -581,8 +581,21 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                                     disabled={isNotifyingAll}
                                     className="flex items-center gap-2 px-5 py-3 bg-white text-slate-800 border border-slate-200 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:shadow-xl hover:border-slate-300 transition-all disabled:opacity-50"
                                 >
-                                    {isNotifyingAll ? <Loader2 size={16} className="animate-spin" /> : <Bell size={16} />}
-                                    Nhắc tất cả
+                                    {isNotifyingAll ? (
+                                        <motion.div
+                                            animate={{ opacity: [0.3, 1, 0.3] }}
+                                            transition={{ duration: 1, repeat: Infinity }}
+                                            className="flex items-center gap-1"
+                                        >
+                                            <span className="w-1.5 h-1.5 bg-secondary rounded-full" />
+                                            <span>Đang nhắc...</span>
+                                        </motion.div>
+                                    ) : (
+                                        <>
+                                            <Bell size={16} />
+                                            Nhắc tất cả
+                                        </>
+                                    )}
                                 </button>
                                 <button
                                     onClick={() => {
@@ -619,7 +632,13 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                         {activeTab === 'users' ? (
                             isUsersLoading ? (
                                 <div className="h-full flex items-center justify-center">
-                                    <Loader2 className="animate-spin text-secondary/60" size={48} strokeWidth={3} />
+                                    <motion.p
+                                        animate={{ opacity: [0.3, 0.6, 0.3] }}
+                                        transition={{ duration: 2, repeat: Infinity }}
+                                        className="text-slate-400 font-black text-[10px] uppercase tracking-widest"
+                                    >
+                                        Đang tải danh sách...
+                                    </motion.p>
                                 </div>
                             ) : (
                                 <motion.div
@@ -735,7 +754,13 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                         ) : (
                             isBillsLoading ? (
                                 <div className="h-full flex items-center justify-center">
-                                    <Loader2 className="animate-spin text-secondary/60" size={48} strokeWidth={3} />
+                                    <motion.p
+                                        animate={{ opacity: [0.3, 0.6, 0.3] }}
+                                        transition={{ duration: 2, repeat: Infinity }}
+                                        className="text-slate-400 font-black text-[10px] uppercase tracking-widest"
+                                    >
+                                        Đang tải hóa đơn...
+                                    </motion.p>
                                 </div>
                             ) : (
                                 <motion.div

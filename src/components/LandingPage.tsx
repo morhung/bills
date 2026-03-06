@@ -7,8 +7,10 @@ import { removeAccents } from '../utils/stringUtils';
 
 export function LandingPage() {
     const navigate = useNavigate();
-    const { users } = useUsers();
     const [searchQuery, setSearchQuery] = useState('');
+
+    // Only fetch users when the user starts typing to save initial load bandwidth
+    const { users } = useUsers(searchQuery.length > 0);
 
     const filteredUsers = useMemo(() => {
         if (!searchQuery || !users) return [];

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Save, User as UserIcon, Mail, Shield, Hash, Smartphone, Loader2, Check } from 'lucide-react';
+import { X, Save, User as UserIcon, Mail, Shield, Hash, Smartphone, Check } from 'lucide-react';
 import type { User } from '../types/database';
 import { chatopsService, type ChatOpsUser } from '../services/chatopsService';
 
@@ -169,7 +169,11 @@ export function AddUserPopup({ isOpen, onClose, onSave, initialData }: AddUserPo
                                     />
                                     {isLoadingSuggestions && (
                                         <div className="absolute right-4 top-1/2 -translate-y-1/2 text-secondary">
-                                            <Loader2 size={16} className="animate-spin" />
+                                            <motion.div
+                                                animate={{ opacity: [0.3, 1, 0.3] }}
+                                                transition={{ duration: 1, repeat: Infinity }}
+                                                className="w-2 h-2 bg-secondary rounded-full"
+                                            />
                                         </div>
                                     )}
 
@@ -214,8 +218,13 @@ export function AddUserPopup({ isOpen, onClose, onSave, initialData }: AddUserPo
                                                         ))
                                                     ) : isLoadingSuggestions ? (
                                                         <div className="py-8 text-center">
-                                                            <Loader2 size={24} className="animate-spin text-secondary/40 mx-auto" />
-                                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2 italic">Đang tìm kiếm...</p>
+                                                            <motion.p
+                                                                animate={{ opacity: [0.3, 1, 0.3] }}
+                                                                transition={{ duration: 1.5, repeat: Infinity }}
+                                                                className="text-[10px] font-black text-secondary/60 uppercase tracking-widest italic"
+                                                            >
+                                                                Đang tìm kiếm...
+                                                            </motion.p>
                                                         </div>
                                                     ) : (
                                                         <div className="py-8 text-center">
@@ -313,7 +322,11 @@ export function AddUserPopup({ isOpen, onClose, onSave, initialData }: AddUserPo
                                 className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-br from-secondary to-primary text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-secondary/20 hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100"
                             >
                                 {isSaving ? (
-                                    <Loader2 className="animate-spin" size={16} strokeWidth={3} />
+                                    <motion.div
+                                        animate={{ opacity: [0.5, 1, 0.5] }}
+                                        transition={{ duration: 1, repeat: Infinity }}
+                                        className="w-1.5 h-1.5 bg-white rounded-full"
+                                    />
                                 ) : (
                                     <Save size={16} strokeWidth={3} />
                                 )}

@@ -6,58 +6,72 @@ import { AdminPage } from './components/AdminPage';
 import { LoginPage } from './components/LoginPage';
 import { LandingPage } from './components/LandingPage';
 import { useBills } from './hooks/useBills';
-import { useUsers } from './hooks/useUsers';
-import { Loader2 } from 'lucide-react';
+import { userService } from './services/userService';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Routes, Route, useLocation, Navigate, useParams } from 'react-router-dom';
 import { supabase } from './lib/supabase';
 import { useState, useMemo, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { MainSkeleton } from './components/MainSkeleton';
 import { generateVietQRString } from './services/vietQRService';
 import type { Session } from '@supabase/supabase-js';
 
 const MainView = ({ session }: { session: Session | null }) => {
     const { userId } = useParams();
-    const { users } = useUsers();
+
+    // 1. Build the complete tag_id for validation and fetching
+    const fullTagId = useMemo(() => {
+        if (!userId) return '';
+        const cleanId = userId.toLowerCase().replace('-runsystem.net', '');
+        return `${cleanId}-runsystem.net`;
+    }, [userId]);
+
+    // Use React Query for deduplication, caching, and handling StrictMode mounting
+    const { data: targetUser, isLoading: isValidatingUser } = useQuery({
+        queryKey: ['user', fullTagId],
+        queryFn: async () => {
+            return await userService.getUserByTagId(fullTagId);
+        },
+        enabled: !!fullTagId,
+        staleTime: 5 * 60 * 1000 // Cache for 5 minutes
+    });
+
+    // 3. Only fetch bills if the user is valid
+    const { bills: allBills, isLoading: isAllBillsLoading, error: allBillsError } = useBills(
+        targetUser ? { tagId: fullTagId } : undefined,
+        !!targetUser
+    );
 
     // Filter State
     const [statusFilter, setStatusFilter] = useState<'unpaid' | 'paid'>('unpaid');
     const [monthFilter, setMonthFilter] = useState(new Date().getMonth());
     const [yearFilter, setYearFilter] = useState(new Date().getFullYear());
 
-    const targetUser = useMemo(() => {
-        if (!users || !userId) return null;
-        const cleanId = userId.toLowerCase();
-        return users.find(u =>
-            u.id === userId ||
-            (u.tag_id && (
-                u.tag_id === userId ||
-                u.tag_id.toLowerCase() === cleanId ||
-                u.tag_id.toLowerCase() === `${cleanId}-runsystem.net`
-            )) ||
-            (u.chatops_channel_id && (
-                u.chatops_channel_id === userId ||
-                u.chatops_channel_id.toLowerCase() === cleanId
-            ))
-        );
-    }, [users, userId]);
+    // Derived state: filter bills on the client-side based on user's selected filters
+    const filteredBills = useMemo(() => {
+        if (!allBills) return [];
 
-    // Fetch bills with server-side filtering
-    const { bills, isLoading, error } = useBills({
-        tagId: targetUser?.tag_id || userId,
-        status: statusFilter,
-        month: monthFilter,
-        year: yearFilter
-    });
+        return allBills.filter(bill => {
+            // Apply status filter
+            const matchesStatus = statusFilter === 'unpaid' ? !bill.is_paid : bill.is_paid;
+            if (!matchesStatus) return false;
+
+            // Apply month/year filter ONLY for paid bills
+            if (statusFilter === 'paid' && monthFilter !== undefined && yearFilter !== undefined) {
+                const billDate = new Date(bill.bill_date);
+                if (billDate.getMonth() !== monthFilter || billDate.getFullYear() !== yearFilter) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+    }, [allBills, statusFilter, monthFilter, yearFilter]);
 
     const totalDebt = useMemo(() => {
-        // Use total_unpaid from user record if available (most efficient)
-        if (targetUser && targetUser.total_unpaid !== undefined) {
-            return targetUser.total_unpaid;
-        }
-        // Fallback: manually calculate from the unpaid list if loaded
-        if (!bills || statusFilter === 'paid') return 0;
-        return bills.filter((b: any) => !b.is_paid).reduce((acc: number, b: any) => acc + (b.total_amount || 0), 0);
-    }, [targetUser, bills, statusFilter]);
+        if (!allBills) return 0;
+        return allBills.filter((b: any) => !b.is_paid).reduce((acc: number, b: any) => acc + (b.total_amount || 0), 0);
+    }, [allBills]);
 
     const qrLink = useMemo(() => {
         if (totalDebt <= 0) return '';
@@ -67,13 +81,22 @@ const MainView = ({ session }: { session: Session | null }) => {
     const displayUserName = useMemo(() => {
         if (targetUser) return targetUser.user_name;
         if (session?.user?.email) return session.user.email.split('@')[0];
-        return 'Khách';
-    }, [targetUser, session]);
+        return userId || 'Khách';
+    }, [targetUser, session, userId]);
+
+    // Validate the route BEFORE returning MainView content
+    if (isValidatingUser) {
+        return <MainSkeleton />;
+    }
+
+    if (!targetUser) {
+        return <Navigate to="/" replace />;
+    }
 
     return (
         <div className="flex-1 flex flex-col overflow-hidden">
             <div className="flex-none bg-white/70 backdrop-blur-3xl border-b border-white/40 shadow-xl shadow-black/5 z-[60]">
-                <Header userName={displayUserName} loading={isLoading} />
+                <Header userName={displayUserName} loading={isAllBillsLoading} />
             </div>
 
             <main className="flex-1 flex overflow-hidden max-w-7xl mx-auto w-full px-4 gap-8 py-4 items-stretch relative">
@@ -84,7 +107,7 @@ const MainView = ({ session }: { session: Session | null }) => {
                     className="flex-1 flex overflow-hidden gap-8"
                 >
                     <aside className="hidden lg:flex flex-col w-[320px] flex-none">
-                        <Summary totalDebt={totalDebt} qrLink={qrLink} loading={isLoading} />
+                        <Summary totalDebt={totalDebt} qrLink={qrLink} loading={isAllBillsLoading} />
                     </aside>
 
                     <div className="flex-1 flex flex-col min-w-0 h-full">
@@ -100,14 +123,14 @@ const MainView = ({ session }: { session: Session | null }) => {
                         </div>
 
                         <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-                            {error ? (
+                            {allBillsError ? (
                                 <div className="py-24 text-center border border-primary/10 rounded-xl p-12 bg-white">
                                     <p className="text-red-500 font-bold text-lg">Đã có lỗi xảy ra khi tải dữ liệu.</p>
                                     <p className="text-sm text-slate-800 mt-2 font-black uppercase tracking-widest">Vui lòng thử lại sau.</p>
                                 </div>
                             ) : (
                                 <div className="pb-8">
-                                    <BillList bills={bills || []} loading={isLoading} />
+                                    <BillList bills={filteredBills} loading={isAllBillsLoading} />
                                 </div>
                             )}
                         </div>
@@ -137,11 +160,7 @@ function App() {
     }, []);
 
     if (isInitialAuthLoading) {
-        return (
-            <div className="h-screen w-full flex items-center justify-center bg-slate-50">
-                <Loader2 className="animate-spin text-primary/60" size={48} strokeWidth={3} />
-            </div>
-        );
+        return <MainSkeleton />;
     }
 
     return (

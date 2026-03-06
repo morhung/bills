@@ -19,7 +19,8 @@ export const billService = {
 
         // apply filters
         if (filters?.tagId) {
-            query = query.eq('tag_id', filters.tagId);
+            const cleanId = filters.tagId.toLowerCase().replace('-runsystem.net', '');
+            query = query.or(`tag_id.eq.${cleanId},tag_id.eq.${cleanId}-runsystem.net`);
         }
 
         if (filters?.status) {
