@@ -130,7 +130,7 @@ export function LandingPage() {
                                                     </div>
                                                     <div className="text-left">
                                                         <h4 className="font-black text-slate-900 uppercase italic tracking-tight">{u.user_name}</h4>
-                                                        <p className="text-[10px] font-black text-slate-800/60 uppercase">
+                                                        <p className="text-[10px] font-black text-slate-800/60">
                                                             {u.tag_id?.trim() ? `@${u.tag_id}` : 'Chưa có ID'}
                                                         </p>
                                                     </div>
@@ -140,7 +140,7 @@ export function LandingPage() {
                                         ))
                                     ) : (
                                         <div className="py-8 text-center bg-white/30 rounded-2xl border border-dashed border-slate-200">
-                                            <p className="text-sm font-black text-slate-800/40 uppercase tracking-widest">Không tìm thấy người dùng này</p>
+                                            <p className="text-sm font-black text-slate-800/40 tracking-widest">Không tìm thấy người dùng này</p>
                                         </div>
                                     )}
                                 </motion.div>

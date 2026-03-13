@@ -97,7 +97,7 @@ export function FilterBar({ status, setStatus, month, setMonth, year, setYear }:
                                 }`}>calendar_month</span>
                             <span className="text-[11px] font-black font-display uppercase tracking-widest mt-0.5 w-[110px] text-center">
                                 {status === 'unpaid'
-                                    ? `${months[new Date().getMonth()]}, ${new Date().getFullYear()}`
+                                    ? 'Tất cả'
                                     : `${months[month]}, ${year}`}
                             </span>
                             <span className={`material-icons text-lg transition-transform duration-300 ${status === 'unpaid'
