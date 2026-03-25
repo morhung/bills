@@ -19,13 +19,13 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
     const { users, isLoading: isUsersLoading } = useUsers();
 
     // Admin Filtering State
-    const [adminUserFilter, setAdminUserFilter] = useState<string>('hungnd-runsystem.net');
+    const [adminUserFilter, setAdminUserFilter] = useState<string>('all');
     const [adminStatusFilter, setAdminStatusFilter] = useState<'unpaid' | 'paid'>('unpaid');
     const [adminMonthFilter, setAdminMonthFilter] = useState(new Date().getMonth());
     const [adminYearFilter, setAdminYearFilter] = useState(new Date().getFullYear());
 
     // UI States for enhanced filters
-    const [userSearchInput, setUserSearchInput] = useState('hungnd-runsystem.net');
+    const [userSearchInput, setUserSearchInput] = useState('');
     const [isUserSuggestionsOpen, setIsUserSuggestionsOpen] = useState(false);
     const [isDatePopupOpen, setIsDatePopupOpen] = useState(false);
 
@@ -41,8 +41,8 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
     const { bills, isLoading: isBillsLoading } = useBills({
         tagId: adminUserFilter === 'all' ? undefined : adminUserFilter,
         status: adminStatusFilter,
-        month: adminStatusFilter === 'unpaid' ? undefined : adminMonthFilter, // Month/year only apply to 'paid' bills
-        year: adminStatusFilter === 'unpaid' ? undefined : adminYearFilter
+        month: adminStatusFilter === 'unpaid' || adminMonthFilter === -1 ? undefined : adminMonthFilter, // Month/year only apply to 'paid' bills
+        year: adminStatusFilter === 'unpaid' || adminMonthFilter === -1 ? undefined : adminYearFilter
     });
 
     const [activeTab, setActiveTab] = useState<'users' | 'bills'>('users');
@@ -61,6 +61,7 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
         setActiveTab('bills');
         setSearchQuery('');
     };
+
 
     // Outside click handlers
     useEffect(() => {
@@ -127,6 +128,10 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
         });
     }, [searchQuery, bills]);
 
+    const filteredTotalAmount = useMemo(() => {
+        return filteredBills.reduce((acc, b) => acc + (b.total_amount || 0), 0);
+    }, [filteredBills]);
+
     const handleSaveBill = async (billData: any) => {
         try {
             await billService.saveBill(billData);
@@ -137,6 +142,7 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
         } catch (error: any) {
             console.error('Error saving bill:', error);
             alert('Lỗi: ' + error.message);
+            throw error; // Re-throw to allow component to handle loading state
         }
     };
 
@@ -303,7 +309,8 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
 
             // Nếu có last_post_id (thread nhắc nợ), gửi tin nhắn cảm ơn và xóa id đó
             if (user.last_post_id) {
-                const thankYouMessage = `✅ Cảm ơn @${user.tag_id} đã thanh toán số tiền **${user.total_unpaid?.toLocaleString('vi-VN')}đ**. Đã ghi nhận thành công! ❤️`;
+                const prefix = user.gender === 2 ? 'anh ' : user.gender === 3 ? 'chị ' : '';
+                const thankYouMessage = `✅ Cảm ơn ${prefix}@${user.tag_id} đã thanh toán số tiền **${user.total_unpaid?.toLocaleString('vi-VN')}đ**. ❤️`;
                 const targetChannel = user.chatops_channel_id || "3it5zuqw3bnk3bwkspuyhsotce";
                 await chatopsService.replyMessage(thankYouMessage, targetChannel, user.last_post_id);
 
@@ -332,24 +339,34 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
     };
 
     return (
-        <div className="h-full flex flex-col gap-6">
+        <div className="h-full flex flex-col gap-6 animate-in fade-in duration-700">
             {/* Header Section */}
             <div className="flex items-center justify-between">
                 <div className="flex flex-col">
-                    <h2 className="text-2xl font-black text-slate-900 font-display tracking-tight uppercase italic leading-none">
-                        Admin Dashboard
-                    </h2>
-                    <p className="text-[10px] font-black text-slate-800 uppercase tracking-[0.3em] mt-2 opacity-60">Hệ thống quản lý chuyên sâu</p>
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-secondary to-primary flex items-center justify-center shadow-lg shadow-secondary/20">
+                            <Shield size={20} className="text-white" strokeWidth={2.5} />
+                        </div>
+                        <h2 className="text-2xl font-black text-slate-900 font-display tracking-tight uppercase italic leading-none">
+                            Admin Dashboard
+                        </h2>
+                    </div>
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mt-3 ml-13 opacity-60">Hệ thống quản lý chuyên sâu • {new Date().toLocaleDateString('vi-VN')}</p>
                 </div>
 
-                <div className="flex items-center gap-4">
-                    <div className="flex flex-col items-end">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Tài khoản</span>
-                        <span className="text-xs font-black text-slate-800 tracking-tight">{userEmail || 'Admin'}</span>
+                <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-3 bg-white/40 px-4 py-2 rounded-2xl border border-white/60 shadow-sm backdrop-blur-md">
+                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden ring-2 ring-white">
+                            <UserIcon size={16} className="text-slate-500" />
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Admin</span>
+                            <span className="text-xs font-black text-slate-800 tracking-tight">{userEmail?.split('@')[0] || 'Administrator'}</span>
+                        </div>
                     </div>
                     <button
                         onClick={handleLogout}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-rose-50 border border-rose-100 text-rose-500 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:bg-rose-100 hover:border-rose-200 transition-all group"
+                        className="flex items-center gap-2 px-5 py-3 bg-white border border-slate-200 text-slate-500 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:bg-rose-50 hover:border-rose-100 hover:text-rose-500 transition-all group group"
                     >
                         <LogOut size={16} strokeWidth={3} className="group-hover:translate-x-0.5 transition-transform" />
                         Đăng xuất
@@ -357,74 +374,123 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                 </div>
             </div>
 
-            {/* Admin Content Card */}
-            <div className="flex-1 glass rounded-[2.5rem] px-8 py-0 border-white/40 shadow-2xl shadow-black/5 overflow-hidden flex flex-col">
+            {/* Admin Content Section */}
+            <div className="flex-1 glass rounded-[3rem] p-4 border-white/40 shadow-2xl shadow-black/5 overflow-hidden flex flex-col relative">
                 {/* Tabs Navigation */}
-                <div className="flex items-center gap-2 mb-2 p-1.5 bg-black/5 backdrop-blur-md rounded-2xl w-fit border border-white/10">
-                    <button
-                        onClick={() => {
-                            setActiveTab('users');
-                            setSearchQuery('');
-                        }}
-                        className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'users' ? 'bg-white text-secondary shadow-lg' : 'text-slate-500 hover:text-slate-800'}`}
-                    >
-                        <div className="flex items-center gap-2">
-                            <Shield size={14} strokeWidth={3} />
-                            Quản lý Người dùng
-                        </div>
-                    </button>
-                    <button
-                        onClick={() => {
-                            setActiveTab('bills');
-                            setSearchQuery('');
-                        }}
-                        className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'bills' ? 'bg-white text-secondary shadow-lg' : 'text-slate-500 hover:text-slate-800'}`}
-                    >
-                        <div className="flex items-center gap-2">
-                            <FileText size={14} strokeWidth={3} />
-                            Quản lý Hóa đơn
-                        </div>
-                    </button>
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2 p-1.5 bg-slate-900/10 backdrop-blur-md rounded-[1.75rem] w-fit border border-white/20">
+                        <button
+                            onClick={() => {
+                                setActiveTab('users');
+                                setSearchQuery('');
+                            }}
+                            className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'users' ? 'bg-white text-rose-500 shadow-lg' : 'text-slate-500 hover:text-slate-800'}`}
+                        >
+                            <div className="flex items-center gap-2">
+                                <Shield size={14} strokeWidth={3} />
+                                Quản lý Người dùng
+                            </div>
+                        </button>
+                        <button
+                            onClick={() => {
+                                setActiveTab('bills');
+                                setSearchQuery('');
+                            }}
+                            className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'bills' ? 'bg-white text-rose-500 shadow-lg' : 'text-slate-500 hover:text-slate-800'}`}
+                        >
+                            <div className="flex items-center gap-2">
+                                <FileText size={14} strokeWidth={3} />
+                                Quản lý Hóa đơn
+                            </div>
+                        </button>
+                    </div>
                 </div>
 
-                {/* Sub-Header with Search & Actions */}
-                <div className="flex items-center gap-4 mb-4">
-                    <div className="flex-1 flex items-center gap-3">
-                        <div className="relative flex-1 max-w-md group">
-                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-800 group-focus-within:text-secondary transition-colors">
+                <div className="flex flex-col gap-4 mb-6">
+                    {/* Primary Row: Search & Actions */}
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="relative flex-1 max-w-xl group">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-rose-500 transition-colors">
                                 <Search size={18} strokeWidth={2.5} />
                             </div>
                             <input
                                 type="text"
-                                placeholder={activeTab === 'users' ? "Tìm kiếm người dùng..." : "Tìm kiếm hóa đơn..."}
+                                placeholder={activeTab === 'users' ? "Tìm kiếm người dùng..." : "Tìm kiếm hóa đơn theo tên, món ăn..."}
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="block w-full pl-12 pr-4 py-3 bg-white/40 border border-white/60 rounded-2xl focus:ring-2 focus:ring-secondary/20 focus:border-secondary/30 transition-all font-display text-sm font-bold text-slate-800 placeholder:text-slate-800/60"
+                                className="block w-full pl-12 pr-4 py-3.5 bg-white/40 border border-white/60 rounded-[1.5rem] focus:ring-4 focus:ring-rose-500/10 focus:border-rose-500/20 transition-all font-bold text-sm text-slate-800 placeholder:text-slate-400"
                             />
                         </div>
 
-                        {activeTab === 'bills' && (
-                            <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-2 duration-500">
-
-
-                                {/* User Autocomplete Filter */}
-                                <div className="relative" ref={userSearchRef}>
-                                    <div
-                                        onClick={() => setIsUserSuggestionsOpen(!isUserSuggestionsOpen)}
-                                        className="flex items-center gap-3 bg-white/60 pl-4 pr-10 py-2 rounded-xl border border-white/80 group focus-within:border-secondary/40 focus-within:bg-white transition-all cursor-pointer relative"
+                        <div className="flex items-center gap-3">
+                            {activeTab === 'users' ? (
+                                <>
+                                    <button
+                                        onClick={handleNotifyAll}
+                                        disabled={isNotifyingAll}
+                                        className="flex items-center gap-2 px-5 py-3.5 bg-white text-slate-800 border border-slate-200 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:shadow-md hover:border-slate-300 transition-all disabled:opacity-50"
                                     >
-                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-secondary transition-colors">
-                                            <UserIcon size={14} />
-                                        </div>
-                                        <span className={`font-black text-xs transition-colors ${adminUserFilter === 'all' ? 'text-slate-400' : 'text-slate-900'}`}>
+                                        {isNotifyingAll ? (
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse" />
+                                                <span>Đang nhắc...</span>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <Bell size={16} className="text-amber-500" />
+                                                Nhắc tất cả
+                                            </>
+                                        )}
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setEditingUser(null);
+                                            setIsAddUserOpen(true);
+                                        }}
+                                        className="flex items-center gap-2 px-6 py-3.5 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-slate-900/10 hover:scale-[1.02] active:scale-95 transition-all"
+                                    >
+                                        <Plus size={16} strokeWidth={3} />
+                                        Người dùng mới
+                                    </button>
+                                </>
+                            ) : (
+                                <button
+                                    onClick={() => {
+                                        setEditingBill(null);
+                                        setIsAddBillOpen(true);
+                                    }}
+                                    className="flex items-center gap-2 px-6 py-3.5 bg-rose-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-rose-500/20 hover:scale-[1.02] active:scale-95 transition-all"
+                                >
+                                    <Plus size={16} strokeWidth={3} />
+                                    Tạo hóa đơn
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Secondary Row: Advanced Filters & Totals (Only for Bills) */}
+                    {activeTab === 'bills' && (
+                        <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-white/40 backdrop-blur-xl rounded-[2rem] border border-white/60 shadow-inner">
+                            <div className="flex flex-wrap items-center gap-2.5">
+                                {/* User Filter */}
+                                <div className="relative" ref={userSearchRef}>
+                                    <button
+                                        onClick={() => setIsUserSuggestionsOpen(!isUserSuggestionsOpen)}
+                                        className={`flex items-center gap-2.5 pl-3.5 pr-8 py-2 rounded-xl border transition-all relative ${adminUserFilter === 'all'
+                                            ? 'bg-white/60 border-white/80 text-slate-500 hover:bg-white'
+                                            : 'bg-rose-50 border-rose-100 text-rose-600 shadow-sm'
+                                            }`}
+                                    >
+                                        <UserIcon size={14} strokeWidth={2.5} />
+                                        <span className="font-black text-[11px] uppercase tracking-wider truncate max-w-[120px]">
                                             {adminUserFilter === 'all'
-                                                ? 'Tất cả người dùng'
-                                                : (users?.find(u => u.tag_id === adminUserFilter)?.user_name || `@${adminUserFilter.replace('-runsystem.net', '')}`)}
+                                                ? 'Người dùng'
+                                                : (users?.find(u => u.tag_id === adminUserFilter)?.user_name || adminUserFilter.split('-')[0])}
                                         </span>
-                                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition-transform duration-300">
-                                            <ChevronDown size={14} className={isUserSuggestionsOpen ? 'rotate-180' : ''} />
+                                        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 opacity-40">
+                                            <ChevronDown size={14} className={`transition-transform duration-300 ${isUserSuggestionsOpen ? 'rotate-180' : ''}`} />
                                         </div>
-                                    </div>
+                                    </button>
 
                                     <AnimatePresence>
                                         {isUserSuggestionsOpen && (
@@ -432,20 +498,20 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                                                 initial={{ opacity: 0, y: 10, scale: 0.95 }}
                                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                                 exit={{ opacity: 0, y: 5, scale: 0.95 }}
-                                                className="absolute top-full left-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden z-[110]"
+                                                className="absolute top-full left-0 mt-2 w-64 bg-white/90 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/40 overflow-hidden z-[110]"
                                             >
-                                                <div className="p-2 border-b border-slate-50 bg-slate-50/50 flex items-center gap-2">
+                                                <div className="p-2 border-b border-slate-50/50 flex items-center gap-2 bg-slate-50/50">
                                                     <Search size={12} className="text-slate-400" />
                                                     <input
                                                         autoFocus
                                                         type="text"
                                                         value={userSearchInput}
                                                         onChange={(e) => setUserSearchInput(e.target.value)}
-                                                        placeholder="Tìm người dùng..."
-                                                        className="bg-transparent border-none font-bold text-[11px] text-slate-700 focus:ring-0 outline-none w-full p-0 placeholder:text-slate-400"
+                                                        placeholder="Tìm nhanh..."
+                                                        className="bg-transparent border-none font-bold text-[10px] text-slate-700 focus:ring-0 outline-none w-full p-0"
                                                     />
                                                 </div>
-                                                <div className="max-h-64 overflow-y-auto custom-scrollbar p-2">
+                                                <div className="max-h-64 overflow-y-auto custom-scrollbar p-1.5">
                                                     {userSuggestions.map(u => (
                                                         <button
                                                             key={u.id}
@@ -455,23 +521,12 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                                                                 setUserSearchInput('');
                                                                 setIsUserSuggestionsOpen(false);
                                                             }}
-                                                            className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-3 ${adminUserFilter === u.tag_id ? 'bg-secondary text-white' : 'hover:bg-slate-50 text-slate-700'}`}
+                                                            className={`w-full text-left px-3 py-2 rounded-xl text-[11px] font-black transition-all flex items-center gap-2.5 ${adminUserFilter === u.tag_id ? 'bg-rose-500 text-white' : 'hover:bg-rose-50 text-slate-600'}`}
                                                         >
-                                                            <div className={`w-6 h-6 rounded-lg flex items-center justify-center overflow-hidden ${adminUserFilter === u.tag_id ? 'bg-white/20' : 'bg-slate-100'}`}>
-                                                                {u.avatar_url ? (
-                                                                    <img src={u.avatar_url} className="w-full h-full object-cover" alt="" />
-                                                                ) : (
-                                                                    <UserIcon size={12} />
-                                                                )}
+                                                            <div className={`w-6 h-6 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0 ${adminUserFilter === u.tag_id ? 'bg-white/20' : 'bg-slate-100'}`}>
+                                                                {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" alt="" /> : <UserIcon size={12} />}
                                                             </div>
-                                                            <div className="flex flex-col">
-                                                                <span className="leading-tight">{u.tag_id === 'all' ? 'Tất cả người dùng' : u.user_name || `@${u.tag_id.replace('-runsystem.net', '')}`}</span>
-                                                                {u.tag_id !== 'all' && u.user_name && (
-                                                                    <span className={`text-[9px] opacity-70 leading-tight ${adminUserFilter === u.tag_id ? 'text-white' : 'text-slate-500'}`}>
-                                                                        @{u.tag_id.replace('-runsystem.net', '')}
-                                                                    </span>
-                                                                )}
-                                                            </div>
+                                                            <span className="truncate">{u.tag_id === 'all' ? 'Tất cả' : u.user_name || u.tag_id.split('-')[0]}</span>
                                                         </button>
                                                     ))}
                                                 </div>
@@ -479,45 +534,40 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                                         )}
                                     </AnimatePresence>
                                 </div>
+
                                 {/* Status Toggle */}
-                                <div className="flex bg-slate-100/50 rounded-[1.25rem] p-1 border border-white/80 shadow-inner backdrop-blur-md">
+                                <div className="flex bg-slate-200/40 rounded-xl p-1 border border-white/60 shadow-inner">
                                     <button
                                         onClick={() => setAdminStatusFilter('unpaid')}
-                                        className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${adminStatusFilter === 'unpaid' ? 'bg-white text-rose-500 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                                        className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${adminStatusFilter === 'unpaid' ? 'bg-white text-rose-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                                     >
                                         Chưa thu
                                     </button>
                                     <button
                                         onClick={() => setAdminStatusFilter('paid')}
-                                        className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${adminStatusFilter === 'paid' ? 'bg-white text-emerald-500 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                                        className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${adminStatusFilter === 'paid' ? 'bg-white text-emerald-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                                     >
                                         Đã thu
                                     </button>
                                 </div>
 
-                                {/* Premium Date Picker Popup */}
+                                {/* Date Picker */}
                                 <div className="relative" ref={datePopupRef}>
                                     <button
-                                        onClick={() => {
-                                            if (adminStatusFilter === 'paid') {
-                                                setIsDatePopupOpen(!isDatePopupOpen);
-                                            }
-                                        }}
+                                        onClick={() => { if (adminStatusFilter === 'paid') setIsDatePopupOpen(!isDatePopupOpen); }}
                                         disabled={adminStatusFilter === 'unpaid'}
-                                        className={`flex items-center gap-3 px-4 py-2 rounded-xl border transition-all ${adminStatusFilter === 'unpaid'
-                                            ? 'bg-slate-100/50 text-slate-400 border-transparent opacity-40 grayscale cursor-not-allowed'
+                                        className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl border transition-all ${adminStatusFilter === 'unpaid'
+                                            ? 'bg-slate-100/50 text-slate-300 border-transparent opacity-40 cursor-not-allowed'
                                             : isDatePopupOpen
-                                                ? 'bg-slate-800 text-white border-slate-800 shadow-lg'
-                                                : 'bg-white/60 text-slate-900 border-white/80 hover:bg-white hover:border-secondary/30'
+                                                ? 'bg-slate-900 text-white border-slate-900 shadow-lg'
+                                                : 'bg-white/60 text-slate-600 border-white/80 hover:bg-white'
                                             }`}
                                     >
-                                        <Calendar size={14} className={adminStatusFilter === 'unpaid' ? 'text-slate-300' : isDatePopupOpen ? 'text-rose-400' : 'text-slate-400'} />
-                                        <span className="text-xs font-black uppercase tracking-widest whitespace-nowrap">
-                                            {adminStatusFilter === 'unpaid'
-                                                ? `${months[new Date().getMonth()].replace('Tháng ', 'T')}, ${new Date().getFullYear()}`
-                                                : `${months[adminMonthFilter].replace('Tháng ', 'T')}, ${adminYearFilter}`}
+                                        <Calendar size={14} strokeWidth={2.5} />
+                                        <span className="text-[11px] font-black uppercase tracking-wider whitespace-nowrap">
+                                            {adminStatusFilter === 'unpaid' ? 'Tháng này' : adminMonthFilter === -1 ? 'Tất cả' : `${months[adminMonthFilter].replace('Tháng ', 'T')}, ${adminYearFilter}`}
                                         </span>
-                                        <span className={`material-icons text-lg transition-transform ${isDatePopupOpen ? 'rotate-180 opacity-50' : 'opacity-20'}`}>expand_more</span>
+                                        <ChevronDown size={14} className={`opacity-40 transition-transform ${isDatePopupOpen ? 'rotate-180' : ''}`} />
                                     </button>
 
                                     <AnimatePresence>
@@ -526,46 +576,33 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                                                 initial={{ opacity: 0, y: 15, scale: 0.95 }}
                                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                                 exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                                className="absolute right-0 top-full mt-2 w-72 bg-white rounded-[1.75rem] p-4 shadow-2xl border border-slate-100 z-[110]"
+                                                className="absolute left-0 top-full mt-2 w-72 bg-white rounded-[1.75rem] p-4 shadow-2xl border border-slate-100 z-[110]"
                                             >
-                                                <div className="flex flex-col gap-5">
-                                                    {/* Year Selection */}
-                                                    <div className="flex items-center justify-between bg-slate-50 p-1 rounded-2xl border border-slate-100">
-                                                        <button
-                                                            onClick={() => setAdminYearFilter(adminYearFilter - 1)}
-                                                            className="w-9 h-9 flex items-center justify-center rounded-xl bg-white shadow-sm hover:text-rose-500 transition-all text-slate-500"
-                                                        >
-                                                            <ChevronLeft size={18} />
-                                                        </button>
-                                                        <div className="flex flex-col items-center">
-                                                            <span className="text-[8px] font-bold uppercase tracking-widest text-slate-400 leading-none mb-1">Năm</span>
-                                                            <span className="text-base font-black text-slate-800">{adminYearFilter}</span>
-                                                        </div>
-                                                        <button
-                                                            onClick={() => setAdminYearFilter(adminYearFilter + 1)}
-                                                            className="w-9 h-9 flex items-center justify-center rounded-xl bg-white shadow-sm hover:text-rose-500 transition-all text-slate-500"
-                                                        >
-                                                            <ChevronRight size={18} />
-                                                        </button>
-                                                    </div>
+                                                <div className="flex flex-col gap-4">
+                                                    <button
+                                                        onClick={() => { setAdminMonthFilter(-1); setIsDatePopupOpen(false); }}
+                                                        className={`w-full py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all border-2 flex items-center justify-center gap-2 ${adminMonthFilter === -1 ? 'bg-slate-900 text-white border-slate-900 shadow-xl' : 'bg-white text-slate-500 border-slate-100 hover:border-slate-300'}`}
+                                                    >
+                                                        <Calendar size={14} />
+                                                        Tất cả
+                                                    </button>
 
-                                                    {/* Month Grid */}
-                                                    <div className="grid grid-cols-4 gap-2">
-                                                        {months.map((m, idx) => (
-                                                            <button
-                                                                key={m}
-                                                                onClick={() => {
-                                                                    setAdminMonthFilter(idx);
-                                                                    setIsDatePopupOpen(false);
-                                                                }}
-                                                                className={`py-2 px-1 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${adminMonthFilter === idx
-                                                                    ? 'bg-slate-800 text-white border-slate-800 shadow-lg'
-                                                                    : 'bg-white text-slate-600 border-slate-100 hover:border-slate-300 hover:bg-slate-50'
-                                                                    }`}
-                                                            >
-                                                                {m.replace('Tháng ', 'T')}
-                                                            </button>
-                                                        ))}
+                                                    <div className="h-px bg-slate-100 mx-2" />
+
+                                                    <div className="flex flex-col gap-4">
+                                                        <div className="flex items-center justify-between bg-slate-50 p-1 rounded-2xl border border-slate-100">
+                                                            <button onClick={() => setAdminYearFilter(adminYearFilter - 1)} className="w-9 h-9 flex items-center justify-center rounded-xl bg-white shadow-sm hover:text-rose-500 transition-all text-slate-500"><ChevronLeft size={18} /></button>
+                                                            <span className="text-base font-black text-slate-800">{adminYearFilter}</span>
+                                                            <button onClick={() => setAdminYearFilter(adminYearFilter + 1)} className="w-9 h-9 flex items-center justify-center rounded-xl bg-white shadow-sm hover:text-rose-500 transition-all text-slate-500"><ChevronRight size={18} /></button>
+                                                        </div>
+                                                        <div className="grid grid-cols-4 gap-2">
+                                                            {months.map((m, idx) => (
+                                                                <button key={m} onClick={() => { setAdminMonthFilter(idx); setIsDatePopupOpen(false); }}
+                                                                    className={`py-2 rounded-xl text-[10px] font-black uppercase transition-all border ${adminMonthFilter === idx ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-100 hover:border-slate-300'}`}>
+                                                                    {m.replace('Tháng ', 'T')}
+                                                                </button>
+                                                            ))}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </motion.div>
@@ -573,60 +610,24 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                                     </AnimatePresence>
                                 </div>
                             </div>
-                        )}
-                    </div>
 
-                    <div className="flex items-center gap-3">
-                        {activeTab === 'users' ? (
-                            <div className="flex items-center gap-3">
-                                <button
-                                    onClick={handleNotifyAll}
-                                    disabled={isNotifyingAll}
-                                    className="flex items-center gap-2 px-5 py-3 bg-white text-slate-800 border border-slate-200 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:shadow-xl hover:border-slate-300 transition-all disabled:opacity-50"
-                                >
-                                    {isNotifyingAll ? (
-                                        <motion.div
-                                            animate={{ opacity: [0.3, 1, 0.3] }}
-                                            transition={{ duration: 1, repeat: Infinity }}
-                                            className="flex items-center gap-1"
-                                        >
-                                            <span className="w-1.5 h-1.5 bg-secondary rounded-full" />
-                                            <span>Đang nhắc...</span>
-                                        </motion.div>
-                                    ) : (
-                                        <>
-                                            <Bell size={16} />
-                                            Nhắc tất cả
-                                        </>
-                                    )}
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setEditingUser(null);
-                                        setIsAddUserOpen(true);
-                                    }}
-                                    className="flex items-center gap-2 px-5 py-3 bg-gradient-to-br from-secondary to-primary text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-secondary/20 hover:scale-105 transition-all"
-                                >
-                                    <Plus size={16} strokeWidth={3} />
-                                    Thêm người dùng
-                                </button>
+                            {/* Summary Totals */}
+                            <div className="flex items-center gap-6 pr-4">
+                                <div className="flex flex-col items-end">
+                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1 text-right">Hóa đơn</span>
+                                    <span className="text-sm font-black text-slate-800 leading-none">{filteredBills.length}</span>
+                                </div>
+                                <div className="h-8 w-px bg-slate-200" />
+                                <div className="flex flex-col items-end">
+                                    <span className="text-[9px] font-black text-rose-500 uppercase tracking-widest leading-none mb-1 text-right">Tổng thanh toán</span>
+                                    <div className="flex items-baseline gap-1 leading-none">
+                                        <span className="text-xl font-black text-slate-900 font-display tracking-tight">{filteredTotalAmount.toLocaleString('vi-VN')}</span>
+                                        <span className="text-[10px] font-black italic text-slate-400">đ</span>
+                                    </div>
+                                </div>
                             </div>
-                        ) : (
-                            <button
-                                onClick={() => {
-                                    setEditingBill(null);
-                                    setIsAddBillOpen(true);
-                                }}
-                                className="flex items-center gap-2 px-5 py-3 bg-gradient-to-br from-secondary to-primary text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-secondary/20 hover:scale-105 transition-all"
-                            >
-                                <Plus size={16} strokeWidth={3} />
-                                Thêm hóa đơn
-                            </button>
-                        )}
-                        <span className="text-[10px] font-black text-slate-800 uppercase tracking-widest bg-white/40 px-3 py-3 rounded-2xl border border-white/60">
-                            {activeTab === 'users' ? `${filteredUsers.length} Users` : `${filteredBills.length} Bills`}
-                        </span>
-                    </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Content Area */}
@@ -654,97 +655,106 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                                 >
                                     <table className="w-full text-left border-collapse">
                                         <thead>
-                                            <tr className="border-b border-white/30">
-                                                <th className="px-6 py-4 text-[10px] font-black text-slate-800 uppercase tracking-widest">Tên người dùng</th>
-                                                <th className="px-6 py-4 text-[10px] font-black text-slate-800 uppercase tracking-widest">Tag ID</th>
-                                                <th className="px-6 py-4 text-right text-[10px] font-black text-slate-800 uppercase tracking-widest">Đã trả</th>
-                                                <th className="px-6 py-4 text-right text-[10px] font-black text-slate-800 uppercase tracking-widest">Chưa trả</th>
-                                                <th className="px-6 py-4 text-[10px] font-black text-slate-800 uppercase tracking-widest text-center">Vai trò</th>
-                                                <th className="px-6 py-4 text-right text-[10px] font-black text-slate-800 uppercase tracking-widest">Thao tác</th>
+                                            <tr className="border-b border-slate-200/60">
+                                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Người dùng</th>
+                                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Đã trả</th>
+                                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Chưa trả</th>
+                                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Vai trò</th>
+                                                <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Thao tác</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-white/10">
+                                        <tbody className="divide-y divide-slate-100/50">
                                             {filteredUsers.map((u: User) => (
-                                                <tr key={u.id} className="group hover:bg-white/40 transition-colors">
-                                                    <td className="px-6 py-5">
+                                                <tr key={u.id} className="group hover:bg-white/60 transition-all duration-300">
+                                                    <td className="px-6 py-4">
                                                         <div className="flex items-center gap-4">
-                                                            <div className="w-11 h-11 rounded-2xl bg-slate-100 flex items-center justify-center ring-2 ring-white shadow-sm overflow-hidden transition-transform group-hover:scale-105 duration-500">
-                                                                {u.avatar_url ? (
-                                                                    <img src={u.avatar_url} alt={u.user_name || ''} className="w-full h-full object-cover" />
-                                                                ) : (
-                                                                    <span className="material-icons text-slate-800 text-2xl">person</span>
+                                                            <div className="relative">
+                                                                <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center ring-1 ring-slate-100 shadow-sm overflow-hidden group-hover:scale-105 group-hover:shadow-md transition-all duration-500">
+                                                                    {u.avatar_url ? (
+                                                                        <img src={u.avatar_url} alt={u.user_name || ''} className="w-full h-full object-cover" />
+                                                                    ) : (
+                                                                        <UserIcon size={20} className="text-slate-400" />
+                                                                    )}
+                                                                </div>
+                                                                {u.role === 1 && (
+                                                                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 rounded-full border-2 border-white flex items-center justify-center shadow-lg">
+                                                                        <Shield size={10} className="text-white" />
+                                                                    </div>
                                                                 )}
                                                             </div>
-                                                            <div className="flex flex-col">
-                                                                <span className="font-black text-slate-900 text-sm tracking-tight">{u.user_name || 'No Name'}</span>
-                                                                <span className="text-[9px] font-black text-slate-800 font-mono italic">{u.email}</span>
+                                                            <div className="flex flex-col gap-0.5">
+                                                                <span className="font-black text-slate-900 text-sm tracking-tight">{u.user_name || 'Anonymous'}</span>
+                                                                <span className="text-[10px] font-bold text-slate-400 font-mono tracking-tight lowercase">@{u.tag_id}</span>
                                                             </div>
                                                         </div>
                                                     </td>
-                                                    <td className="px-6 py-5">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-[11px] font-black text-slate-800 font-mono tracking-tight tabular-nums bg-slate-100 px-2 py-1 rounded-lg">{u.tag_id}</span>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-xs font-black text-emerald-600 font-display">{(u.total_paid || 0).toLocaleString('vi-VN')}đ</span>
                                                         </div>
                                                     </td>
-                                                    <td className="px-6 py-5 text-right">
-                                                        <span className="text-[13px] font-black text-emerald-600 font-display">{(u.total_paid || 0).toLocaleString('vi-VN')}đ</span>
-                                                    </td>
-                                                    <td className="px-6 py-5 text-right">
-                                                        <span className={`text-[13px] font-black font-display ${(u.total_unpaid || 0) > 0 ? 'text-rose-500' : 'text-slate-400'}`}>
-                                                            {(u.total_unpaid || 0).toLocaleString('vi-VN')}đ
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-6 py-5 text-center">
-                                                        <div className="flex items-center justify-center gap-2">
-                                                            <div className={`w-1.5 h-1.5 rounded-full ${u.role === 1 ? 'bg-secondary' : 'bg-slate-800'}`}></div>
-                                                            <span className={`font-black text-[9px] uppercase tracking-widest ${u.role === 1 ? 'text-secondary font-black' : 'text-slate-800 font-bold'}`}>
-                                                                {u.role === 1 ? 'ADMIN' : u.role === 2 ? 'SYSTEM' : 'MEMBER'}
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex flex-col">
+                                                            <span className={`text-xs font-black font-display ${(u.total_unpaid || 0) > 0 ? 'text-rose-500' : 'text-slate-300'}`}>
+                                                                {(u.total_unpaid || 0).toLocaleString('vi-VN')}đ
                                                             </span>
                                                         </div>
                                                     </td>
-                                                    <td className="px-6 py-5 text-right">
-                                                        <div className="flex items-center justify-end gap-3 transition-all duration-500">
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex justify-center">
+                                                            <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border transition-colors ${u.role === 1
+                                                                ? 'bg-rose-50 border-rose-100 text-rose-500'
+                                                                : u.role === 2
+                                                                    ? 'bg-blue-50 border-blue-100 text-blue-500'
+                                                                    : 'bg-slate-50 border-slate-100 text-slate-500'
+                                                                }`}>
+                                                                {u.role === 1 ? 'Admin' : u.role === 2 ? 'System' : 'Member'}
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <div className="flex items-center justify-end gap-2 transition-all duration-300">
                                                             {(u.total_unpaid || 0) > 0 && (
                                                                 <>
                                                                     <button
                                                                         onClick={() => handleNotifyUser(u)}
-                                                                        className="w-9 h-9 rounded-xl glass flex items-center justify-center text-slate-500 hover:text-amber-500 hover:bg-white hover:shadow-lg transition-all"
-                                                                        title="Thông báo nhắc nợ"
+                                                                        className="w-8 h-8 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 hover:text-amber-500 hover:border-amber-100 hover:shadow-md transition-all active:scale-95"
+                                                                        title="Nhắc nợ"
                                                                     >
-                                                                        <Bell size={16} strokeWidth={2.5} />
+                                                                        <Bell size={14} strokeWidth={2.5} />
                                                                     </button>
                                                                     <button
                                                                         onClick={() => handlePayUserBills(u)}
-                                                                        className="w-9 h-9 rounded-xl glass flex items-center justify-center text-slate-500 hover:text-emerald-500 hover:bg-white hover:shadow-lg transition-all"
-                                                                        title="Thanh toán tất cả"
+                                                                        className="w-8 h-8 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 hover:text-emerald-500 hover:border-emerald-100 hover:shadow-md transition-all active:scale-95"
+                                                                        title="Thanh toán"
                                                                     >
-                                                                        <CreditCard size={16} strokeWidth={2.5} />
+                                                                        <CreditCard size={14} strokeWidth={2.5} />
                                                                     </button>
                                                                 </>
                                                             )}
                                                             <button
                                                                 onClick={() => viewUserBills(u.tag_id)}
-                                                                className="w-9 h-9 rounded-xl glass flex items-center justify-center text-slate-500 hover:text-primary hover:bg-white hover:shadow-lg transition-all"
-                                                                title="Xem hóa đơn"
+                                                                className="w-8 h-8 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 hover:text-primary hover:border-primary/20 hover:shadow-md transition-all active:scale-95"
+                                                                title="Hóa đơn"
                                                             >
-                                                                <FileText size={16} strokeWidth={2.5} />
+                                                                <FileText size={14} strokeWidth={2.5} />
                                                             </button>
                                                             <button
                                                                 onClick={() => {
                                                                     setEditingUser(u);
                                                                     setIsAddUserOpen(true);
                                                                 }}
-                                                                className="w-9 h-9 rounded-xl glass flex items-center justify-center text-slate-500 hover:text-secondary hover:bg-white hover:shadow-lg transition-all"
-                                                                title="Chỉnh sửa"
+                                                                className="w-8 h-8 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:border-rose-100 hover:shadow-md transition-all active:scale-95"
+                                                                title="Sửa"
                                                             >
-                                                                <Edit3 size={16} strokeWidth={2.5} />
+                                                                <Edit3 size={14} strokeWidth={2.5} />
                                                             </button>
                                                             <button
                                                                 onClick={() => handleDeleteUser(u)}
-                                                                className="w-9 h-9 rounded-xl glass flex items-center justify-center text-slate-500 hover:text-accent hover:bg-white hover:shadow-lg transition-all"
-                                                                title="Xóa người dùng"
+                                                                className="w-8 h-8 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-900 hover:border-slate-300 hover:shadow-md transition-all active:scale-95"
+                                                                title="Xóa"
                                                             >
-                                                                <Trash2 size={16} strokeWidth={2.5} />
+                                                                <Trash2 size={14} strokeWidth={2.5} />
                                                             </button>
                                                         </div>
                                                     </td>
@@ -776,87 +786,86 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                                 >
                                     <table className="w-full text-left border-collapse">
                                         <thead>
-                                            <tr className="border-b border-white/30">
-                                                <th className="px-6 py-4 text-[10px] font-black text-slate-800 uppercase tracking-widest">Hóa đơn</th>
-                                                <th className="px-6 py-4 text-[10px] font-black text-slate-800 uppercase tracking-widest">Người đặt</th>
-                                                <th className="px-6 py-4 text-right text-[10px] font-black text-slate-800 uppercase tracking-widest">Tổng tiền</th>
-                                                <th className="px-6 py-4 text-[10px] font-black text-slate-800 uppercase tracking-widest text-center">Trạng thái</th>
-                                                <th className="px-6 py-4 text-right text-[10px] font-black text-slate-800 uppercase tracking-widest">Thao tác</th>
+                                            <tr className="border-b border-slate-200/60">
+                                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Hóa đơn</th>
+                                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Người đặt</th>
+                                                <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Tổng tiền</th>
+                                                <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Trạng thái</th>
+                                                <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Thao tác</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-white/10">
+                                        <tbody className="divide-y divide-slate-100/50">
                                             {filteredBills.map((b: DetailedBill) => (
                                                 <React.Fragment key={b.id}>
                                                     <tr
                                                         onClick={() => setExpandedBillId(expandedBillId === b.id ? null : b.id)}
-                                                        className={`group hover:bg-white/40 transition-colors cursor-pointer ${expandedBillId === b.id ? 'bg-white/50' : ''}`}
+                                                        className={`group hover:bg-white/60 transition-all duration-300 cursor-pointer ${expandedBillId === b.id ? 'bg-white/80' : ''}`}
                                                     >
-                                                        <td className="px-6 py-5">
+                                                        <td className="px-6 py-4">
                                                             <div className="flex items-center gap-4">
-                                                                <div className="w-11 h-11 rounded-2xl glass flex items-center justify-center text-slate-800 group-hover:text-secondary transition-colors">
-                                                                    <span className="material-icons text-xl">{expandedBillId === b.id ? 'expand_less' : 'receipt'}</span>
+                                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${expandedBillId === b.id ? 'bg-rose-500 text-white shadow-lg rotate-180' : 'bg-slate-50 text-slate-400 group-hover:bg-slate-100'}`}>
+                                                                    <ChevronDown size={18} strokeWidth={3} />
                                                                 </div>
-                                                                <div className="flex flex-col">
-                                                                    <span className="font-black text-slate-900 text-sm italic uppercase leading-none mb-1">{new Date(b.bill_date).toLocaleDateString('vi-VN')}</span>
+                                                                <div className="flex flex-col gap-0.5">
+                                                                    <span className="font-black text-slate-900 text-sm tracking-tight">{new Date(b.bill_date).toLocaleDateString('vi-VN')}</span>
                                                                     <div className="flex items-center gap-2">
-                                                                        <span className="text-[9px] font-black text-secondary uppercase tracking-[0.2em]">{b.bill_items.length} món</span>
-                                                                        <span className="w-1 h-1 rounded-full bg-slate-800"></span>
-                                                                        <span className="text-[9px] font-bold text-slate-800 font-mono">ID: {b.id.slice(0, 8)}</span>
+                                                                        <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest leading-none bg-rose-50 px-1.5 py-0.5 rounded-md border border-rose-100/50">{b.bill_items.length} món</span>
+                                                                        <span className="text-[9px] font-bold text-slate-400 font-mono">ID: {b.id.slice(0, 8)}</span>
                                                                     </div>
                                                                 </div>
                                                             </div>
                                                         </td>
-                                                        <td className="px-6 py-5">
+                                                        <td className="px-6 py-4">
                                                             <div className="flex items-center gap-3">
-                                                                <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center shadow-sm overflow-hidden">
+                                                                <div className="w-8 h-8 rounded-lg bg-white ring-1 ring-slate-100 flex items-center justify-center overflow-hidden shadow-sm">
                                                                     {b.users?.avatar_url ? (
                                                                         <img src={b.users.avatar_url} alt="" className="w-full h-full object-cover" />
                                                                     ) : (
-                                                                        <span className="material-icons text-slate-800 text-lg">person</span>
+                                                                        <UserIcon size={14} className="text-slate-400" />
                                                                     )}
                                                                 </div>
-                                                                <span className="font-black text-slate-900 text-[11px] tracking-tight uppercase italic">{b.users?.user_name || 'Hệ thống'}</span>
+                                                                <span className="font-black text-slate-800 text-xs tracking-tight uppercase italic">{b.users?.user_name || 'Hệ thống'}</span>
                                                             </div>
                                                         </td>
-                                                        <td className="px-6 py-5 text-right">
-                                                            <div className={`flex items-baseline justify-end gap-1 ${b.total_amount < 0 ? 'text-orange-500' : !b.is_paid ? 'text-rose-500' : 'text-emerald-500'}`}>
-                                                                <span className="font-black text-base font-display tracking-tight drop-shadow-sm">{b.total_amount.toLocaleString('vi-VN')}</span>
+                                                        <td className="px-6 py-4 text-right">
+                                                            <div className={`flex items-baseline justify-end gap-1 ${b.total_amount < 0 ? 'text-amber-500' : !b.is_paid ? 'text-rose-500' : 'text-emerald-500'}`}>
+                                                                <span className="font-black text-base font-display tracking-tight leading-none">{b.total_amount.toLocaleString('vi-VN')}</span>
                                                                 <span className="text-[10px] font-black italic">đ</span>
                                                             </div>
                                                         </td>
-                                                        <td className="px-6 py-2">
+                                                        <td className="px-6 py-4">
                                                             <div className="flex justify-center">
-                                                                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border shadow-sm ${b.is_paid
-                                                                    ? 'bg-emerald-50/50 border-emerald-100 text-emerald-600'
-                                                                    : 'bg-rose-50/50 border-rose-100 text-rose-500'
+                                                                <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full border transition-all ${b.is_paid
+                                                                    ? 'bg-emerald-50 border-emerald-100 text-emerald-600'
+                                                                    : 'bg-rose-50 border-rose-100 text-rose-500'
                                                                     }`}>
-                                                                    <span className={`w-1.5 h-1.5 rounded-full ${b.is_paid ? 'bg-emerald-500' : 'bg-rose-500 animate-pulse'}`}></span>
+                                                                    <div className={`w-1.5 h-1.5 rounded-full ${b.is_paid ? 'bg-emerald-500' : 'bg-rose-500 animate-pulse'}`}></div>
                                                                     <span className="text-[9px] font-black uppercase tracking-widest">{b.is_paid ? 'Đã thu' : 'Chưa thu'}</span>
                                                                 </div>
                                                             </div>
                                                         </td>
-                                                        <td className="px-6 py-5 text-right">
-                                                            <div className="flex items-center justify-end gap-3 transition-all duration-500">
+                                                        <td className="px-6 py-4 text-right">
+                                                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                                                                 <button
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
                                                                         setEditingBill(b);
                                                                         setIsAddBillOpen(true);
                                                                     }}
-                                                                    className="w-9 h-9 rounded-xl glass flex items-center justify-center text-slate-800 hover:text-secondary hover:bg-white hover:shadow-lg transition-all"
-                                                                    title="Chỉnh sửa"
+                                                                    className="w-8 h-8 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:border-rose-100 hover:shadow-md transition-all active:scale-95"
+                                                                    title="Sửa"
                                                                 >
-                                                                    <Edit3 size={16} strokeWidth={2.5} />
+                                                                    <Edit3 size={14} strokeWidth={2.5} />
                                                                 </button>
                                                                 <button
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
                                                                         handleDeleteBill(b);
                                                                     }}
-                                                                    className="w-9 h-9 rounded-xl glass flex items-center justify-center text-slate-800 hover:text-accent hover:bg-white hover:shadow-lg transition-all"
-                                                                    title="Xóa hóa đơn"
+                                                                    className="w-8 h-8 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-900 hover:border-slate-300 hover:shadow-md transition-all active:scale-95"
+                                                                    title="Xóa"
                                                                 >
-                                                                    <Trash2 size={16} strokeWidth={2.5} />
+                                                                    <Trash2 size={14} strokeWidth={2.5} />
                                                                 </button>
                                                             </div>
                                                         </td>
@@ -864,29 +873,34 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                                                     <AnimatePresence>
                                                         {expandedBillId === b.id && (
                                                             <tr key={`expand-${b.id}`}>
-                                                                <td colSpan={5} className="px-8 pb-6 bg-slate-50/30">
+                                                                <td colSpan={5} className="px-6 pb-6 bg-transparent">
                                                                     <motion.div
                                                                         initial={{ height: 0, opacity: 0 }}
                                                                         animate={{ height: 'auto', opacity: 1 }}
                                                                         exit={{ height: 0, opacity: 0 }}
                                                                         transition={{ duration: 0.3, ease: 'easeInOut' }}
-                                                                        className="overflow-hidden bg-white/60 backdrop-blur-xl rounded-3xl border border-white shadow-inner px-6 py-0 mt-2"
+                                                                        className="overflow-hidden bg-slate-900/5 backdrop-blur-md rounded-3xl border border-white/40 shadow-inner p-4 mt-2"
                                                                     >
-                                                                        <div className="space-y-3">
+                                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                                             {b.bill_items.map((item: BillItem, idx: number) => (
-                                                                                <div key={idx} className="flex items-center justify-between px-3 py-0 rounded-2xl hover:bg-white/80 transition-colors border border-transparent hover:border-slate-100">
-                                                                                    <div className="flex items-center gap-4">
-                                                                                        <div className="w-8 h-8 rounded-xl bg-secondary/5 flex items-center justify-center text-secondary">
+                                                                                <div key={idx} className="flex items-center justify-between p-3 rounded-2xl bg-white/60 border border-white/60 hover:border-rose-100 transition-all group/item">
+                                                                                    <div className="flex items-center gap-3">
+                                                                                        <div className="w-8 h-8 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-500 group-hover/item:bg-rose-500 group-hover/item:text-white transition-colors">
                                                                                             <span className="material-icons text-sm">local_cafe</span>
                                                                                         </div>
                                                                                         <div className="flex flex-col">
-                                                                                            <span className="text-xs font-black text-slate-800 tracking-tight">{item.item_name}</span>
-                                                                                            <span className="text-[9px] font-bold text-slate-800 uppercase tracking-widest">Số lượng: {item.quantity}</span>
+                                                                                            <span className="text-[11px] font-black text-slate-800 tracking-tight">{item.item_name}</span>
+                                                                                            <span className="text-[9px] font-bold text-slate-400 tracking-widest">Qty: {item.quantity} × {item.unit_price.toLocaleString('vi-VN')}đ</span>
                                                                                         </div>
                                                                                     </div>
-                                                                                    <div className="flex items-baseline gap-1">
-                                                                                        <span className="text-xs font-black text-slate-900 font-display">{item.item_name ? (item.unit_price * item.quantity - item.discount_amount).toLocaleString('vi-VN') : 0}</span>
-                                                                                        <span className="text-[9px] font-black italic text-slate-800">đ</span>
+                                                                                    <div className="flex flex-col items-end">
+                                                                                        <div className="flex items-baseline gap-1">
+                                                                                            <span className="text-xs font-black text-slate-900 font-display">{(item.unit_price * item.quantity - (item.discount_amount || 0)).toLocaleString('vi-VN')}</span>
+                                                                                            <span className="text-[9px] font-black italic text-slate-400">đ</span>
+                                                                                        </div>
+                                                                                        {item.discount_amount > 0 && (
+                                                                                            <span className="text-[8px] font-black text-rose-400 tracking-tighter italic">-{item.discount_amount.toLocaleString('vi-VN')}đ disc</span>
+                                                                                        )}
                                                                                     </div>
                                                                                 </div>
                                                                             ))}

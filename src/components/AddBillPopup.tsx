@@ -19,6 +19,8 @@ export function AddBillPopup({ isOpen, onClose, onSave, users, initialData }: Ad
     const [items, setItems] = useState([{ item_name: '', quantity: 1, unit_price: 0, discount_amount: 0 }]);
     const [userSearchQuery, setUserSearchQuery] = useState('');
     const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         if (initialData) {
@@ -73,17 +75,64 @@ export function AddBillPopup({ isOpen, onClose, onSave, users, initialData }: Ad
         setItems(newItems);
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        onSave({
-            id: initialData?.id,
-            bill_date: billDate,
-            user_id: userId,
-            is_paid: isPaid,
-            total_amount: totalAmount,
-            items: items.filter(item => item.item_name.trim() !== '')
-        });
-        onClose();
+    const handleSubmit = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        
+        if (isSaving) return;
+
+        // Validation
+        if (!userId) {
+            setError('Vui lòng chọn người đặt hóa đơn');
+            // Scroll to top to see error
+            const form = document.querySelector('form');
+            if (form) form.scrollTop = 0;
+            return;
+        }
+
+        const validItems = items.filter(item => item.item_name.trim() !== '');
+        if (validItems.length === 0) {
+            setError('Vui lòng nhập ít nhất một món ăn');
+            return;
+        }
+
+        // Validate each item's values
+        for (const item of validItems) {
+            if (item.quantity <= 0) {
+                setError(`Món "${item.item_name}" phải có số lượng lớn hơn 0`);
+                return;
+            }
+            if (isNaN(item.unit_price)) {
+                setError(`Món "${item.item_name}" phải có đơn giá`);
+                return;
+            }
+            if (isNaN(item.discount_amount)) {
+                setError(`Món "${item.item_name}" phải có mức giảm giá (có thể nhập 0)`);
+                return;
+            }
+        }
+
+        setError(null);
+        setIsSaving(true);
+
+        try {
+            await onSave({
+                id: initialData?.id,
+                bill_date: billDate,
+                user_id: userId,
+                is_paid: isPaid,
+                total_amount: totalAmount,
+                items: validItems
+            });
+            // AdminPage handles closing on success via onSave -> setIsAddBillOpen(false)
+            // But if it doesn't, we can call onClose() here if needed.
+            // However, based on AdminPage.tsx, it's handled there.
+        } catch (err: any) {
+            // Error is handled in AdminPage (alert)
+            // We just stop the loading state here
+            setError(err.message || 'Có lỗi xảy ra khi lưu hóa đơn');
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     if (!isOpen) return null;
@@ -124,6 +173,16 @@ export function AddBillPopup({ isOpen, onClose, onSave, users, initialData }: Ad
                     </div>
 
                     <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-8">
+                        {error && (
+                            <motion.div
+                                initial={{ opacity: 0, y: -10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-600 text-xs font-bold"
+                            >
+                                <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                                {error}
+                            </motion.div>
+                        )}
                         {/* Basic Info */}
                         <div className="grid grid-cols-2 gap-6">
                             <div className="space-y-2">
@@ -320,11 +379,21 @@ export function AddBillPopup({ isOpen, onClose, onSave, users, initialData }: Ad
                                 {isPaid ? 'Đã thanh toán' : 'Chưa thanh toán'}
                             </button>
                             <button
-                                onClick={handleSubmit}
-                                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-br from-secondary to-primary text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-secondary/20 hover:scale-105 transition-all"
+                                onClick={() => handleSubmit()}
+                                disabled={isSaving}
+                                className={`flex items-center gap-2 px-6 py-3 bg-gradient-to-br from-secondary to-primary text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-secondary/20 hover:scale-105 transition-all ${isSaving ? 'opacity-70 cursor-not-allowed' : ''}`}
                             >
-                                <Save size={16} strokeWidth={3} />
-                                {initialData ? 'Cập nhật' : 'Lưu hóa đơn'}
+                                {isSaving ? (
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        Đang lưu...
+                                    </div>
+                                ) : (
+                                    <>
+                                        <Save size={16} strokeWidth={3} />
+                                        {initialData ? 'Cập nhật' : 'Lưu hóa đơn'}
+                                    </>
+                                )}
                             </button>
                         </div>
                     </div>
