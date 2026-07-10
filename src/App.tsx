@@ -5,16 +5,93 @@ import { BillList } from './components/BillList';
 import { AdminPage } from './components/AdminPage';
 import { LoginPage } from './components/LoginPage';
 import { LandingPage } from './components/LandingPage';
+import { PaymentHistoryDetail } from './components/PaymentHistoryDetail';
 import { useBills } from './hooks/useBills';
+import { usePaymentHistory } from './hooks/usePaymentHistory';
 import { userService } from './services/userService';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Routes, Route, useLocation, Navigate, useParams } from 'react-router-dom';
+import { Routes, Route, useLocation, Navigate, useParams, Link } from 'react-router-dom';
 import { supabase } from './lib/supabase';
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MainSkeleton } from './components/MainSkeleton';
 import { generateVietQRString } from './services/vietQRService';
 import type { Session } from '@supabase/supabase-js';
+
+const PaymentHistoryList = ({ histories, loading }: { histories: any[]; loading: boolean }) => {
+    if (loading) {
+        return (
+            <div className="flex flex-col gap-2 pb-12 w-full animate-pulse">
+                <div className="h-16 bg-slate-100 rounded-[2rem]"></div>
+                <div className="h-16 bg-slate-100 rounded-[2rem]"></div>
+                <div className="h-16 bg-slate-100 rounded-[2rem]"></div>
+            </div>
+        );
+    }
+
+    if (!histories || histories.length === 0) {
+        return (
+            <div className="py-24 bg-white/40 border border-white/60 rounded-[3rem] shadow-sm flex flex-col items-center text-center px-6 relative overflow-hidden group">
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent to-slate-50/50 pointer-events-none"></div>
+                <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mb-6 text-slate-300 shadow-xl shadow-slate-200/50 border border-slate-100 transition-all duration-700 z-10">
+                    <span className="material-icons text-5xl">history</span>
+                </div>
+                <p className="text-sm text-slate-500 font-medium max-w-xs leading-relaxed z-10">Chưa có lịch sử thanh toán nào !</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex flex-col gap-2 pb-12 w-full">
+            {histories.map((h: any) => {
+                const formattedDate = new Date(h.sent_at).toLocaleDateString('vi-VN');
+                const isPaid = h.status === 'paid';
+                return (
+                    <Link
+                        key={h.id}
+                        to={`/payment-history/${h.id}`}
+                        className="flex items-center justify-between p-3 flex-wrap sm:flex-nowrap bg-white/60 hover:bg-white border border-white/80 hover:border-slate-200 hover:shadow-md rounded-[2rem] transition-all duration-300 cursor-pointer group gap-2"
+                    >
+                        <div className="flex items-center gap-4">
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
+                                isPaid ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-500'
+                            }`}>
+                                <span className="material-icons text-xl">
+                                    {isPaid ? 'task_alt' : 'notifications_active'}
+                                </span>
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="font-display font-black text-base text-slate-800 tracking-tight leading-snug">
+                                    Đợt nhắc nợ ngày {formattedDate}
+                                </span>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 flex items-center gap-1">
+                                    Chốt {h.items?.length || 0} món nước
+                                </span>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-4 ml-auto sm:ml-0">
+                            <div className="flex flex-col items-end gap-1.5">
+                                <span className={`font-display font-black text-lg leading-none ${isPaid ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                    {h.total_amount.toLocaleString('vi-VN')}đ
+                                </span>
+                                <span className={`px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest border leading-none ${
+                                    isPaid 
+                                        ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
+                                        : 'bg-amber-50 text-amber-600 border-amber-100 animate-pulse'
+                                }`}>
+                                    {isPaid ? 'Đã thu' : 'Chưa thu'}
+                                </span>
+                            </div>
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-slate-50 text-slate-400 shrink-0 group-hover:bg-slate-100 group-hover:text-slate-600 transition-colors">
+                                <span className="material-icons text-sm">chevron_right</span>
+                            </div>
+                        </div>
+                    </Link>
+                );
+            })}
+        </div>
+    );
+};
 
 const MainView = ({ session }: { session: Session | null }) => {
     const { userId } = useParams();
@@ -42,7 +119,14 @@ const MainView = ({ session }: { session: Session | null }) => {
         !!targetUser
     );
 
-    // Filter State
+    // Fetch payment histories
+    const { histories: paymentHistories, isLoading: isHistoriesLoading } = usePaymentHistory(
+        targetUser ? targetUser.id : undefined,
+        !!targetUser
+    );
+
+    // Filter State & Tab State
+    const [userTab, setUserTab] = useState<'bills' | 'history'>('bills');
     const [statusFilter, setStatusFilter] = useState<'unpaid' | 'paid'>('unpaid');
     const [monthFilter, setMonthFilter] = useState(new Date().getMonth());
     const [yearFilter, setYearFilter] = useState(new Date().getFullYear());
@@ -111,29 +195,53 @@ const MainView = ({ session }: { session: Session | null }) => {
                     </aside>
 
                     <div className="flex-1 flex flex-col min-w-0 h-full">
-                        <div className="flex-none pb-4 border-b border-slate-200/40 mb-2 relative z-[80]">
-                            <FilterBar
-                                status={statusFilter}
-                                setStatus={setStatusFilter}
-                                month={monthFilter}
-                                setMonth={setMonthFilter}
-                                year={yearFilter}
-                                setYear={setYearFilter}
-                            />
+                        {/* Tab Switcher */}
+                        <div className="flex gap-6 mb-4 border-b border-slate-200/20 pb-1 flex-none">
+                            <button
+                                onClick={() => setUserTab('bills')}
+                                className={`pb-2.5 px-1 text-sm font-black uppercase tracking-wider transition-all border-b-2 ${userTab === 'bills' ? 'border-primary text-slate-800' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                            >
+                                Đơn hàng chi tiết
+                            </button>
+                            <button
+                                onClick={() => setUserTab('history')}
+                                className={`pb-2.5 px-1 text-sm font-black uppercase tracking-wider transition-all border-b-2 ${userTab === 'history' ? 'border-primary text-slate-800' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                            >
+                                Lịch sử thanh toán
+                            </button>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-                            {allBillsError ? (
-                                <div className="py-24 text-center border border-primary/10 rounded-xl p-12 bg-white">
-                                    <p className="text-red-500 font-bold text-lg">Đã có lỗi xảy ra khi tải dữ liệu.</p>
-                                    <p className="text-sm text-slate-800 mt-2 font-black uppercase tracking-widest">Vui lòng thử lại sau.</p>
+                        {userTab === 'bills' ? (
+                            <>
+                                <div className="flex-none pb-4 border-b border-slate-200/40 mb-2 relative z-[80]">
+                                    <FilterBar
+                                        status={statusFilter}
+                                        setStatus={setStatusFilter}
+                                        month={monthFilter}
+                                        setMonth={setMonthFilter}
+                                        year={yearFilter}
+                                        setYear={setYearFilter}
+                                    />
                                 </div>
-                            ) : (
-                                <div className="pb-8">
-                                    <BillList bills={filteredBills} loading={isAllBillsLoading} />
+
+                                <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                                    {allBillsError ? (
+                                        <div className="py-24 text-center border border-primary/10 rounded-xl p-12 bg-white">
+                                            <p className="text-red-500 font-bold text-lg">Đã có lỗi xảy ra khi tải dữ liệu.</p>
+                                            <p className="text-sm text-slate-800 mt-2 font-black uppercase tracking-widest">Vui lòng thử lại sau.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="pb-8">
+                                            <BillList bills={filteredBills} loading={isAllBillsLoading} />
+                                        </div>
+                                    )}
                                 </div>
-                            )}
-                        </div>
+                            </>
+                        ) : (
+                            <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                                <PaymentHistoryList histories={paymentHistories || []} loading={isHistoriesLoading} />
+                            </div>
+                        )}
                     </div>
                 </motion.div>
             </main>
@@ -173,6 +281,7 @@ function App() {
 
                     <Route path="/" element={<LandingPage />} />
                     <Route path="/:userId" element={<MainView session={session} />} />
+                    <Route path="/payment-history/:id" element={<PaymentHistoryDetail />} />
 
                     <Route path="/admin" element={
                         session ? (

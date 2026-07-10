@@ -57,3 +57,21 @@ export type ViewBill = {
         discount_amount: number;
     }[];
 };
+
+export type PaymentHistory = {
+    id: string;
+    user_id: string;
+    total_amount: number;
+    status: 'unpaid' | 'paid';
+    sent_at: string;
+    paid_at: string | null;
+    payment_method: 'momo' | 'vib' | null;
+    items: {
+        id?: string;
+        item_name: string;
+        quantity: number;
+        unit_price: number;
+        discount_amount: number;
+        bill_date?: string;
+    }[];
+};

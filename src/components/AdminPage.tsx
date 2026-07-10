@@ -13,6 +13,8 @@ import { billService } from '../services/billService';
 import { chatopsService } from '../services/chatopsService';
 import { removeAccents } from '../utils/stringUtils';
 import { generateVietQRString, generateVietQRVIBString } from '../services/vietQRService';
+import { paymentHistoryService } from '../services/paymentHistoryService';
+import { usePaymentHistory } from '../hooks/usePaymentHistory';
 
 export function AdminPage({ userEmail }: { userEmail?: string }) {
     const queryClient = useQueryClient();
@@ -45,7 +47,7 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
         year: adminStatusFilter === 'unpaid' || adminMonthFilter === -1 ? undefined : adminYearFilter
     });
 
-    const [activeTab, setActiveTab] = useState<'users' | 'bills'>('users');
+    const [activeTab, setActiveTab] = useState<'users' | 'bills' | 'payment_history'>('users');
     const [searchQuery, setSearchQuery] = useState('');
     const [expandedBillId, setExpandedBillId] = useState<string | null>(null);
     const [isAddBillOpen, setIsAddBillOpen] = useState(false);
@@ -53,6 +55,12 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [editingBill, setEditingBill] = useState<DetailedBill | null>(null);
     const [isNotifyingAll, setIsNotifyingAll] = useState(false);
+    const [paymentMethodUser, setPaymentMethodUser] = useState<User | null>(null);
+
+    const { histories: allPaymentHistories, isLoading: isPaymentHistoriesLoading } = usePaymentHistory(
+        undefined,
+        activeTab === 'payment_history'
+    );
 
     const viewUserBills = (tagId: string) => {
         setAdminUserFilter(tagId);
@@ -131,6 +139,25 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
     const filteredTotalAmount = useMemo(() => {
         return filteredBills.reduce((acc, b) => acc + (b.total_amount || 0), 0);
     }, [filteredBills]);
+
+    const filteredPaymentHistories = useMemo(() => {
+        if (!allPaymentHistories) return [];
+        const normalizedSearch = removeAccents(searchQuery).trim().toLowerCase();
+        if (!normalizedSearch) return allPaymentHistories;
+        return allPaymentHistories.filter((h: any) => {
+            const u = users?.find(user => user.id === h.user_id);
+            const nameStr = u ? u.user_name : '';
+            const dateStr = new Date(h.sent_at).toLocaleDateString('vi-VN');
+            const methodStr = h.payment_method || '';
+            return (
+                removeAccents(nameStr).includes(normalizedSearch) ||
+                dateStr.includes(normalizedSearch) ||
+                h.total_amount.toString().includes(normalizedSearch) ||
+                h.status.includes(normalizedSearch) ||
+                methodStr.toLowerCase().includes(normalizedSearch)
+            );
+        });
+    }, [searchQuery, allPaymentHistories, users]);
 
     const handleSaveBill = async (billData: any) => {
         try {
@@ -226,21 +253,63 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
     const handleNotifyUser = async (user: User, silent: boolean = false) => {
         if (!user.total_unpaid || user.total_unpaid <= 0) return false;
 
-        const qrMoMo = generateVietQRString(user.total_unpaid);
-        const qrVib = generateVietQRVIBString(user.total_unpaid);
+        try {
+            // 1. Fetch unpaid bills of this user
+            const { data: unpaidBills, error: fetchBillsError } = await supabase
+                .from('bills')
+                .select('id, bill_date, total_amount')
+                .eq('user_id', user.id)
+                .eq('is_paid', false);
 
-        const prefix = user.gender === 2 ? 'anh ' : user.gender === 3 ? 'chị ' : '';
-        const message = `:emo_flower: Hi ${prefix}@${user.tag_id},
+            if (fetchBillsError) throw fetchBillsError;
+
+            // 2. Fetch all bill items of these unpaid bills
+            let itemsSnapshot: any[] = [];
+            if (unpaidBills && unpaidBills.length > 0) {
+                const billIds = unpaidBills.map(b => b.id);
+                const { data: billItems, error: fetchItemsError } = await supabase
+                    .from('bill_items')
+                    .select('id, bill_id, item_name, quantity, unit_price, discount_amount')
+                    .in('bill_id', billIds);
+
+                if (fetchItemsError) throw fetchItemsError;
+
+                const billIdToDate = unpaidBills.reduce((acc: Record<string, string>, b) => {
+                    acc[b.id] = b.bill_date;
+                    return acc;
+                }, {});
+
+                itemsSnapshot = (billItems || []).map(item => ({
+                    id: item.id,
+                    item_name: item.item_name,
+                    quantity: item.quantity,
+                    unit_price: item.unit_price,
+                    discount_amount: item.discount_amount,
+                    bill_date: billIdToDate[item.bill_id]
+                }));
+            }
+
+            // 3. Upsert the payment history record
+            const paymentHistoryId = await paymentHistoryService.upsertPaymentHistory(
+                user.id,
+                user.total_unpaid,
+                itemsSnapshot
+            );
+
+            const qrMoMo = generateVietQRString(user.total_unpaid);
+            const qrVib = generateVietQRVIBString(user.total_unpaid);
+
+            const prefix = user.gender === 2 ? 'anh ' : user.gender === 3 ? 'chị ' : '';
+            const message = `:emo_flower: Hi ${prefix}@${user.tag_id},
 
  :pepesaber: Dư nợ tuần này là: ${user.total_unpaid.toLocaleString('vi-VN')} VND :money_mouth_face: :money_mouth_face: :money_mouth_face: 
 
- :point_right: Chi tiết xem [tại đây](https://drink-bill.vercel.app/${user.tag_id.replace('-runsystem.net', '')}) 
+ :point_right: Chi tiết biên lai thanh toán xem [tại đây](https://drink-bill.vercel.app/payment-history/${paymentHistoryId}) 
 
  :momo: Scan QR code bên dưới để chuyển cho HùngND. 
 
  ![image](${qrMoMo}) ![image](${qrVib})`;
 
-        try {
             const targetChannel = user.chatops_channel_id || "3it5zuqw3bnk3bwkspuyhsotce";
             const postId = await chatopsService.postMessage(message, targetChannel);
             if (postId) {
@@ -254,6 +323,7 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                 if (!silent) {
                     alert('Đã gửi thông báo nhắc nợ thành công!');
                     queryClient.invalidateQueries({ queryKey: ['users'] });
+                    queryClient.invalidateQueries({ queryKey: ['paymentHistories'] });
                 }
                 return true;
             }
@@ -296,25 +366,64 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
 
 
     const handlePayUserBills = async (user: User) => {
-        if (!confirm(`Bạn có chắc muốn đánh dấu TẤT CẢ hóa đơn của "${user.user_name}" (Tổng: ${user.total_unpaid?.toLocaleString('vi-VN')}đ) là ĐÃ THANH TOÁN?`)) return;
+        setPaymentMethodUser(user);
+    };
 
+    const handleConfirmPayment = async (user: User, method: 'momo' | 'vib') => {
         try {
-            const { error } = await supabase
+            // 1. Fetch unpaid bills of this user
+            const { data: unpaidBills } = await supabase
+                .from('bills')
+                .select('id, bill_date, total_amount')
+                .eq('user_id', user.id)
+                .eq('is_paid', false);
+
+            let itemsSnapshot: any[] = [];
+            let totalAmount = user.total_unpaid || 0;
+            if (unpaidBills && unpaidBills.length > 0) {
+                const billIds = unpaidBills.map(b => b.id);
+                const { data: billItems } = await supabase
+                    .from('bill_items')
+                    .select('id, bill_id, item_name, quantity, unit_price, discount_amount')
+                    .in('bill_id', billIds);
+
+                const billIdToDate = unpaidBills.reduce((acc: Record<string, string>, b) => {
+                    acc[b.id] = b.bill_date;
+                    return acc;
+                }, {});
+
+                itemsSnapshot = (billItems || []).map(item => ({
+                    id: item.id,
+                    item_name: item.item_name,
+                    quantity: item.quantity,
+                    unit_price: item.unit_price,
+                    discount_amount: item.discount_amount,
+                    bill_date: billIdToDate[item.bill_id]
+                }));
+                totalAmount = unpaidBills.reduce((acc, b) => acc + Number(b.total_amount), 0);
+            }
+
+            // 2. Mark the bills as paid in the bills table
+            const { error: billUpdateError } = await supabase
                 .from('bills')
                 .update({ is_paid: true })
                 .eq('user_id', user.id)
                 .eq('is_paid', false);
 
-            if (error) throw error;
+            if (billUpdateError) throw billUpdateError;
 
-            // Nếu có last_post_id (thread nhắc nợ), gửi tin nhắn cảm ơn và xóa id đó
+            // 3. Update the payment history status
+            await paymentHistoryService.markLatestAsPaid(user.id, method, totalAmount, itemsSnapshot);
+
+            // 4. Send thank you message to ChatOps
             if (user.last_post_id) {
                 const prefix = user.gender === 2 ? 'anh ' : user.gender === 3 ? 'chị ' : '';
-                const thankYouMessage = `✅ Cảm ơn ${prefix}@${user.tag_id} đã thanh toán số tiền **${user.total_unpaid?.toLocaleString('vi-VN')}đ**. ❤️`;
+                const methodText = method === 'momo' ? 'ví MoMo' : 'ngân hàng VIB';
+                const thankYouMessage = `✅ Cảm ơn ${prefix}@${user.tag_id} đã thanh toán số tiền **${totalAmount.toLocaleString('vi-VN')}đ** qua ${methodText}. ❤️`;
                 const targetChannel = user.chatops_channel_id || "3it5zuqw3bnk3bwkspuyhsotce";
                 await chatopsService.replyMessage(thankYouMessage, targetChannel, user.last_post_id);
 
-                // Xóa last_post_id để lần nợ sau sẽ tạo thread mới
+                // Clear last_post_id to start a new thread next time
                 await supabase
                     .from('users')
                     .update({ last_post_id: null })
@@ -324,9 +433,12 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
             alert('Thanh toán thành công!');
             queryClient.invalidateQueries({ queryKey: ['bills'] });
             queryClient.invalidateQueries({ queryKey: ['users'] });
+            queryClient.invalidateQueries({ queryKey: ['paymentHistories'] });
         } catch (error: any) {
-            console.error('Error paying user bills:', error);
+            console.error('Error confirming payment:', error);
             alert('Lỗi: ' + error.message);
+        } finally {
+            setPaymentMethodUser(null);
         }
     };
 
@@ -403,6 +515,18 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                                 Quản lý Hóa đơn
                             </div>
                         </button>
+                        <button
+                            onClick={() => {
+                                setActiveTab('payment_history');
+                                setSearchQuery('');
+                            }}
+                            className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'payment_history' ? 'bg-white text-rose-500 shadow-lg' : 'text-slate-500 hover:text-slate-800'}`}
+                        >
+                            <div className="flex items-center gap-2">
+                                <FileText size={14} strokeWidth={3} className="rotate-180" />
+                                Lịch sử thanh toán
+                            </div>
+                        </button>
                     </div>
                 </div>
 
@@ -415,7 +539,13 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                             </div>
                             <input
                                 type="text"
-                                placeholder={activeTab === 'users' ? "Tìm kiếm người dùng..." : "Tìm kiếm hóa đơn theo tên, món ăn..."}
+                                placeholder={
+                                    activeTab === 'users' 
+                                        ? "Tìm kiếm người dùng..." 
+                                        : activeTab === 'bills'
+                                            ? "Tìm kiếm hóa đơn theo tên, món ăn..."
+                                            : "Tìm kiếm lịch sử theo tên, ngày..."
+                                }
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="block w-full pl-12 pr-4 py-3.5 bg-white/40 border border-white/60 rounded-[1.5rem] focus:ring-4 focus:ring-rose-500/10 focus:border-rose-500/20 transition-all font-bold text-sm text-slate-800 placeholder:text-slate-400"
@@ -453,7 +583,7 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                                         Người dùng mới
                                     </button>
                                 </>
-                            ) : (
+                            ) : activeTab === 'bills' ? (
                                 <button
                                     onClick={() => {
                                         setEditingBill(null);
@@ -464,7 +594,7 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                                     <Plus size={16} strokeWidth={3} />
                                     Tạo hóa đơn
                                 </button>
-                            )}
+                            ) : null}
                         </div>
                     </div>
 
@@ -764,7 +894,7 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                                     </table>
                                 </motion.div>
                             )
-                        ) : (
+                        ) : activeTab === 'bills' ? (
                             isBillsLoading ? (
                                 <div className="h-full flex items-center justify-center">
                                     <motion.p
@@ -915,8 +1045,134 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                                         </tbody>
                                     </table>
                                 </motion.div>
-                            )
-                        )}
+                            ) ) : (
+                                isPaymentHistoriesLoading ? (
+                                    <div className="h-full flex items-center justify-center">
+                                        <motion.p
+                                            animate={{ opacity: [0.3, 0.6, 0.3] }}
+                                            transition={{ duration: 2, repeat: Infinity }}
+                                            className="text-slate-400 font-black text-[10px] uppercase tracking-widest"
+                                        >
+                                            Đang tải lịch sử...
+                                        </motion.p>
+                                    </div>
+                                ) : (
+                                    <motion.div
+                                        key="payment_history"
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -10 }}
+                                    transition={{ duration: 0.3 }}
+                                    className="space-y-4"
+                                >
+                                    <table className="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr className="border-b border-slate-200/60">
+                                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Đợt nhắc nợ</th>
+                                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Người nhận</th>
+                                                <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Tổng tiền</th>
+                                                <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Trạng thái</th>
+                                                <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Phương thức</th>
+                                                <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Thao tác</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100/50">
+                                            {filteredPaymentHistories.map((h: any) => {
+                                                const u = users?.find(user => user.id === h.user_id);
+                                                const formattedDate = new Date(h.sent_at).toLocaleDateString('vi-VN');
+                                                const isPaid = h.status === 'paid';
+                                                return (
+                                                    <tr key={h.id} className="hover:bg-white/60 transition-all duration-300">
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex flex-col gap-0.5">
+                                                                <span className="font-black text-slate-900 text-sm tracking-tight">Đợt chốt ngày {formattedDate}</span>
+                                                                <span className="text-[9px] font-bold text-slate-400 font-mono">ID: {h.id.slice(0, 8).toUpperCase()}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="w-8 h-8 rounded-lg bg-white ring-1 ring-slate-100 flex items-center justify-center overflow-hidden shadow-sm">
+                                                                    {u?.avatar_url ? (
+                                                                        <img src={u.avatar_url} alt="" className="w-full h-full object-cover" />
+                                                                    ) : (
+                                                                        <UserIcon size={14} className="text-slate-400" />
+                                                                    )}
+                                                                </div>
+                                                                <span className="font-black text-slate-800 text-xs tracking-tight uppercase italic">{u?.user_name || 'Khách'}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-right">
+                                                            <div className={`flex items-baseline justify-end gap-1 font-black font-display text-base ${isPaid ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                                                <span>{h.total_amount.toLocaleString('vi-VN')}</span>
+                                                                <span className="text-[10px] italic font-black">đ</span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex justify-center">
+                                                                <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full border transition-all ${
+                                                                    isPaid
+                                                                        ? 'bg-emerald-50 border-emerald-100 text-emerald-600'
+                                                                        : 'bg-amber-50 border-amber-100 text-amber-600'
+                                                                }`}>
+                                                                    <div className={`w-1.5 h-1.5 rounded-full ${isPaid ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`}></div>
+                                                                    <span className="text-[9px] font-black uppercase tracking-widest">{isPaid ? 'Đã thu' : 'Chưa thu'}</span>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex justify-center">
+                                                                {h.payment_method ? (
+                                                                    <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${
+                                                                        h.payment_method === 'momo'
+                                                                            ? 'bg-rose-50 text-rose-600 border border-rose-100'
+                                                                            : 'bg-blue-50 text-blue-600 border border-blue-100'
+                                                                    }`}>
+                                                                        {h.payment_method}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-slate-400 text-xs">—</span>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-right">
+                                                            <div className="flex items-center justify-end gap-2">
+                                                                <a
+                                                                    href={`/payment-history/${h.id}`}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="w-8 h-8 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:border-rose-100 hover:shadow-md transition-all active:scale-95"
+                                                                    title="Xem Biên Lai"
+                                                                >
+                                                                    <FileText size={14} strokeWidth={2.5} />
+                                                                </a>
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        if (confirm('Bạn có chắc muốn xóa lịch sử thanh toán này?')) {
+                                                                            try {
+                                                                                await paymentHistoryService.deletePaymentHistory(h.id);
+                                                                                alert('Xóa thành công!');
+                                                                                queryClient.invalidateQueries({ queryKey: ['paymentHistories'] });
+                                                                                queryClient.invalidateQueries({ queryKey: ['users'] });
+                                                                            } catch (err: any) {
+                                                                                alert('Lỗi: ' + err.message);
+                                                                            }
+                                                                        }
+                                                                    }}
+                                                                    className="w-8 h-8 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-900 hover:border-slate-300 hover:shadow-md transition-all active:scale-95"
+                                                                    title="Xóa"
+                                                                >
+                                                                    <Trash2 size={14} strokeWidth={2.5} />
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </motion.div>
+                            ) )
+                        }
                     </AnimatePresence>
                 </div>
             </div>
@@ -941,6 +1197,55 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                 onSave={handleSaveUser}
                 initialData={editingUser}
             />
+
+            {/* Payment Method Selection Modal */}
+            <AnimatePresence>
+                {paymentMethodUser && (
+                    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl p-6 max-w-sm w-full flex flex-col gap-6"
+                        >
+                            <div className="text-center">
+                                <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-4">
+                                    <CreditCard size={24} />
+                                </div>
+                                <h3 className="text-lg font-black text-slate-900 tracking-tight">Xác nhận Thanh toán</h3>
+                                <p className="text-xs text-slate-500 mt-2 leading-relaxed">
+                                    Bạn đang xác nhận thanh toán tất cả hóa đơn cho <strong>{paymentMethodUser.user_name}</strong>.
+                                    Số tiền: <strong className="text-emerald-600">{paymentMethodUser.total_unpaid?.toLocaleString('vi-VN')}đ</strong>.
+                                </p>
+                            </div>
+
+                            <div className="flex flex-col gap-3">
+                                <button
+                                    onClick={() => handleConfirmPayment(paymentMethodUser, 'momo')}
+                                    className="flex items-center justify-center gap-3 w-full py-3.5 bg-rose-50 hover:bg-rose-100/80 text-rose-700 border border-rose-100 rounded-2xl font-bold text-sm transition-all active:scale-95"
+                                >
+                                    <span className="px-1.5 py-0.5 bg-rose-500 text-white rounded text-[9px] font-black uppercase">Momo</span>
+                                    Xác nhận qua MoMo
+                                </button>
+                                <button
+                                    onClick={() => handleConfirmPayment(paymentMethodUser, 'vib')}
+                                    className="flex items-center justify-center gap-3 w-full py-3.5 bg-blue-50 hover:bg-blue-100/80 text-blue-700 border border-blue-100 rounded-2xl font-bold text-sm transition-all active:scale-95"
+                                >
+                                    <span className="px-1.5 py-0.5 bg-blue-600 text-white rounded text-[9px] font-black uppercase">VIB</span>
+                                    Xác nhận qua VIB Bank
+                                </button>
+                            </div>
+
+                            <button
+                                onClick={() => setPaymentMethodUser(null)}
+                                className="w-full py-3 text-slate-400 hover:text-slate-600 font-bold text-xs uppercase tracking-widest transition-colors"
+                            >
+                                Hủy bỏ
+                            </button>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }
