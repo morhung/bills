@@ -104,15 +104,46 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
 
     const filteredUsers = useMemo(() => {
         if (!users) return [];
-        const normalizedSearch = removeAccents(searchQuery).trim();
-        if (!normalizedSearch) return users;
 
-        return users.filter((u: User) =>
-            removeAccents(u.user_name || '').includes(normalizedSearch) ||
-            removeAccents(u.chatops_channel_id || '').includes(normalizedSearch) ||
-            removeAccents(u.tag_id || '').includes(normalizedSearch) ||
-            removeAccents(u.email || '').includes(normalizedSearch)
-        );
+        let result = [...users];
+        const normalizedSearch = removeAccents(searchQuery).trim().toLowerCase();
+
+        if (normalizedSearch) {
+            result = result.filter((u: User) =>
+                removeAccents(u.user_name || '').toLowerCase().includes(normalizedSearch) ||
+                removeAccents(u.chatops_channel_id || '').toLowerCase().includes(normalizedSearch) ||
+                removeAccents(u.tag_id || '').toLowerCase().includes(normalizedSearch) ||
+                removeAccents(u.email || '').toLowerCase().includes(normalizedSearch)
+            );
+        }
+
+        // Sort: 1. Positive debt (>0) desc. 2. Negative debt (<0) desc (most overpaid first). 3. Zero debt alphabetically.
+        return result.sort((a, b) => {
+            const debtA = a.total_unpaid || 0;
+            const debtB = b.total_unpaid || 0;
+
+            const isPosA = debtA > 0;
+            const isPosB = debtB > 0;
+            const isNegA = debtA < 0;
+            const isNegB = debtB < 0;
+
+            // Group 1: Positive Debt
+            if (isPosA && !isPosB) return -1;
+            if (!isPosA && isPosB) return 1;
+            if (isPosA && isPosB) {
+                return debtB - debtA;
+            }
+
+            // Group 2: Negative Debt
+            if (isNegA && !isNegB) return -1; // Negative comes before zero (if B is 0)
+            if (!isNegA && isNegB) return 1;  // Negative comes before zero (if A is 0)
+            if (isNegA && isNegB) {
+                return debtA - debtB; // show most negative first
+            }
+
+            // Group 3: Zero Debt
+            return (a.user_name || '').localeCompare(b.user_name || '', 'vi');
+        });
     }, [searchQuery, users]);
 
     const filteredBills = useMemo(() => {
@@ -142,20 +173,38 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
 
     const filteredPaymentHistories = useMemo(() => {
         if (!allPaymentHistories) return [];
+
+        let result = [...allPaymentHistories];
         const normalizedSearch = removeAccents(searchQuery).trim().toLowerCase();
-        if (!normalizedSearch) return allPaymentHistories;
-        return allPaymentHistories.filter((h: any) => {
-            const u = users?.find(user => user.id === h.user_id);
-            const nameStr = u ? u.user_name : '';
-            const dateStr = new Date(h.sent_at).toLocaleDateString('vi-VN');
-            const methodStr = h.payment_method || '';
-            return (
-                removeAccents(nameStr).includes(normalizedSearch) ||
-                dateStr.includes(normalizedSearch) ||
-                h.total_amount.toString().includes(normalizedSearch) ||
-                h.status.includes(normalizedSearch) ||
-                methodStr.toLowerCase().includes(normalizedSearch)
-            );
+
+        if (normalizedSearch) {
+            result = result.filter((h: any) => {
+                const u = users?.find(user => user.id === h.user_id);
+                const nameStr = u ? u.user_name : '';
+                const dateStr = new Date(h.sent_at).toLocaleDateString('vi-VN');
+                const methodStr = h.payment_method || '';
+                return (
+                    removeAccents(nameStr).toLowerCase().includes(normalizedSearch) ||
+                    dateStr.includes(normalizedSearch) ||
+                    h.total_amount.toString().includes(normalizedSearch) ||
+                    h.status.includes(normalizedSearch) ||
+                    methodStr.toLowerCase().includes(normalizedSearch)
+                );
+            });
+        }
+
+        // Sort: 1. 'unpaid' status comes first. 2. Sorted by sent_at desc (newest first).
+        return result.sort((a, b) => {
+            const isUnpaidA = a.status === 'unpaid';
+            const isUnpaidB = b.status === 'unpaid';
+
+            if (isUnpaidA && !isUnpaidB) return -1;
+            if (!isUnpaidA && isUnpaidB) return 1;
+
+            // If same status, sort by sent_at desc (newest first)
+            const dateA = new Date(a.sent_at).getTime();
+            const dateB = new Date(b.sent_at).getTime();
+            return dateB - dateA;
         });
     }, [searchQuery, allPaymentHistories, users]);
 
@@ -540,8 +589,8 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                             <input
                                 type="text"
                                 placeholder={
-                                    activeTab === 'users' 
-                                        ? "Tìm kiếm người dùng..." 
+                                    activeTab === 'users'
+                                        ? "Tìm kiếm người dùng..."
                                         : activeTab === 'bills'
                                             ? "Tìm kiếm hóa đơn theo tên, món ăn..."
                                             : "Tìm kiếm lịch sử theo tên, ngày..."
@@ -825,7 +874,7 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                                                     </td>
                                                     <td className="px-6 py-4">
                                                         <div className="flex flex-col">
-                                                            <span className={`text-xs font-black font-display ${(u.total_unpaid || 0) > 0 ? 'text-rose-500' : 'text-slate-300'}`}>
+                                                            <span className={`text-xs font-black font-display ${(u.total_unpaid || 0) > 0 ? 'text-rose-500' : (u.total_unpaid || 0) < 0 ? 'text-amber-500' : 'text-slate-300'}`}>
                                                                 {(u.total_unpaid || 0).toLocaleString('vi-VN')}đ
                                                             </span>
                                                         </div>
@@ -1045,20 +1094,20 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                                         </tbody>
                                     </table>
                                 </motion.div>
-                            ) ) : (
-                                isPaymentHistoriesLoading ? (
-                                    <div className="h-full flex items-center justify-center">
-                                        <motion.p
-                                            animate={{ opacity: [0.3, 0.6, 0.3] }}
-                                            transition={{ duration: 2, repeat: Infinity }}
-                                            className="text-slate-400 font-black text-[10px] uppercase tracking-widest"
-                                        >
-                                            Đang tải lịch sử...
-                                        </motion.p>
-                                    </div>
-                                ) : (
-                                    <motion.div
-                                        key="payment_history"
+                            )) : (
+                            isPaymentHistoriesLoading ? (
+                                <div className="h-full flex items-center justify-center">
+                                    <motion.p
+                                        animate={{ opacity: [0.3, 0.6, 0.3] }}
+                                        transition={{ duration: 2, repeat: Infinity }}
+                                        className="text-slate-400 font-black text-[10px] uppercase tracking-widest"
+                                    >
+                                        Đang tải lịch sử...
+                                    </motion.p>
+                                </div>
+                            ) : (
+                                <motion.div
+                                    key="payment_history"
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -10 }}
@@ -1068,7 +1117,7 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                                     <table className="w-full text-left border-collapse">
                                         <thead>
                                             <tr className="border-b border-slate-200/60">
-                                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Đợt nhắc nợ</th>
+                                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Biên lai</th>
                                                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Người nhận</th>
                                                 <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Tổng tiền</th>
                                                 <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Trạng thái</th>
@@ -1085,7 +1134,7 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                                                     <tr key={h.id} className="hover:bg-white/60 transition-all duration-300">
                                                         <td className="px-6 py-4">
                                                             <div className="flex flex-col gap-0.5">
-                                                                <span className="font-black text-slate-900 text-sm tracking-tight">Đợt chốt ngày {formattedDate}</span>
+                                                                <span className="font-black text-slate-900 text-sm tracking-tight">Biên lai ngày {formattedDate}</span>
                                                                 <span className="text-[9px] font-bold text-slate-400 font-mono">ID: {h.id.slice(0, 8).toUpperCase()}</span>
                                                             </div>
                                                         </td>
@@ -1109,11 +1158,10 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                                                         </td>
                                                         <td className="px-6 py-4">
                                                             <div className="flex justify-center">
-                                                                <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full border transition-all ${
-                                                                    isPaid
-                                                                        ? 'bg-emerald-50 border-emerald-100 text-emerald-600'
-                                                                        : 'bg-amber-50 border-amber-100 text-amber-600'
-                                                                }`}>
+                                                                <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full border transition-all ${isPaid
+                                                                    ? 'bg-emerald-50 border-emerald-100 text-emerald-600'
+                                                                    : 'bg-amber-50 border-amber-100 text-amber-600'
+                                                                    }`}>
                                                                     <div className={`w-1.5 h-1.5 rounded-full ${isPaid ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`}></div>
                                                                     <span className="text-[9px] font-black uppercase tracking-widest">{isPaid ? 'Đã thu' : 'Chưa thu'}</span>
                                                                 </div>
@@ -1122,11 +1170,10 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                                                         <td className="px-6 py-4">
                                                             <div className="flex justify-center">
                                                                 {h.payment_method ? (
-                                                                    <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${
-                                                                        h.payment_method === 'momo'
-                                                                            ? 'bg-rose-50 text-rose-600 border border-rose-100'
-                                                                            : 'bg-blue-50 text-blue-600 border border-blue-100'
-                                                                    }`}>
+                                                                    <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${h.payment_method === 'momo'
+                                                                        ? 'bg-rose-50 text-rose-600 border border-rose-100'
+                                                                        : 'bg-blue-50 text-blue-600 border border-blue-100'
+                                                                        }`}>
                                                                         {h.payment_method}
                                                                     </span>
                                                                 ) : (
@@ -1171,7 +1218,7 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                                         </tbody>
                                     </table>
                                 </motion.div>
-                            ) )
+                            ))
                         }
                     </AnimatePresence>
                 </div>
