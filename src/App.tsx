@@ -53,19 +53,18 @@ const PaymentHistoryList = ({ histories, loading }: { histories: any[]; loading:
                         className="flex items-center justify-between p-3 flex-wrap sm:flex-nowrap bg-white/60 hover:bg-white border border-white/80 hover:border-slate-200 hover:shadow-md rounded-[2rem] transition-all duration-300 cursor-pointer group gap-2"
                     >
                         <div className="flex items-center gap-4">
-                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
-                                isPaid ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-500'
-                            }`}>
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${isPaid ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-500'
+                                }`}>
                                 <span className="material-icons text-xl">
                                     {isPaid ? 'task_alt' : 'notifications_active'}
                                 </span>
                             </div>
                             <div className="flex flex-col">
                                 <span className="font-display font-black text-base text-slate-800 tracking-tight leading-snug">
-                                    Đợt nhắc nợ ngày {formattedDate}
+                                    Biên lai thanh toán ngày {formattedDate}
                                 </span>
                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 flex items-center gap-1">
-                                    Chốt {h.items?.length || 0} món nước
+                                    Chốt {h.items?.length || 0} item
                                 </span>
                             </div>
                         </div>
@@ -74,11 +73,10 @@ const PaymentHistoryList = ({ histories, loading }: { histories: any[]; loading:
                                 <span className={`font-display font-black text-lg leading-none ${isPaid ? 'text-emerald-600' : 'text-amber-600'}`}>
                                     {h.total_amount.toLocaleString('vi-VN')}đ
                                 </span>
-                                <span className={`px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest border leading-none ${
-                                    isPaid 
-                                        ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
-                                        : 'bg-amber-50 text-amber-600 border-amber-100 animate-pulse'
-                                }`}>
+                                <span className={`px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest border leading-none ${isPaid
+                                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                    : 'bg-amber-50 text-amber-600 border-amber-100 animate-pulse'
+                                    }`}>
                                     {isPaid ? 'Đã thu' : 'Chưa thu'}
                                 </span>
                             </div>

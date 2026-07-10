@@ -51,7 +51,7 @@ export function PaymentHistoryDetail() {
     const { user } = history;
     const userProfileUrl = user ? `/${user.tag_id.replace('-runsystem.net', '')}` : '/';
     const isPaid = history.status === 'paid';
-    
+
     // Generate QR codes for the total debt amount of this specific history entry
     const qrMoMo = generateVietQRString(history.total_amount);
     const qrVib = generateVietQRVIBString(history.total_amount);
@@ -70,7 +70,7 @@ export function PaymentHistoryDetail() {
                         className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-800 font-bold text-sm bg-white hover:bg-slate-50 px-4 py-2.5 rounded-2xl border border-slate-100 shadow-sm transition-all active:scale-95"
                     >
                         <ArrowLeft size={16} strokeWidth={2.5} />
-                        Trang cá nhân của {user?.user_name || 'User'}
+                        {user?.user_name || 'User'}
                     </Link>
                     <div className="flex items-center gap-2">
                         <Receipt size={18} className="text-primary" />
@@ -100,17 +100,16 @@ export function PaymentHistoryDetail() {
                                 <div className="grid grid-cols-2 gap-4 bg-slate-50/50 p-4 rounded-3xl border border-slate-100">
                                     <div className="flex flex-col gap-1">
                                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Trạng thái</span>
-                                        <div className={`self-start px-3 py-1 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-1.5 border ${
-                                            isPaid 
-                                                ? 'bg-emerald-50 text-emerald-600 border-emerald-200/50' 
-                                                : 'bg-amber-50 text-amber-600 border-amber-200/50 animate-pulse'
-                                        }`}>
+                                        <div className={`self-start px-3 py-1 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-1.5 border ${isPaid
+                                            ? 'bg-emerald-50 text-emerald-600 border-emerald-200/50'
+                                            : 'bg-amber-50 text-amber-600 border-amber-200/50 animate-pulse'
+                                            }`}>
                                             <span className={`w-1.5 h-1.5 rounded-full ${isPaid ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`}></span>
                                             {isPaid ? 'Đã thanh toán' : 'Chưa thanh toán'}
                                         </div>
                                     </div>
                                     <div className="flex flex-col gap-1 text-right">
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Người nhận nợ</span>
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Người nhận</span>
                                         <span className="text-sm font-black text-slate-800 leading-tight">{user?.user_name || 'Khách'}</span>
                                     </div>
                                 </div>
@@ -154,7 +153,7 @@ export function PaymentHistoryDetail() {
                                 {/* Items list section */}
                                 <div className="flex flex-col gap-3">
                                     <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2 pb-2 border-b border-slate-100">
-                                        <ShoppingBag size={12} /> Danh sách sản phẩm chốt nợ
+                                        <ShoppingBag size={12} /> Danh sách sản phẩm
                                     </h4>
 
                                     <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
@@ -218,7 +217,7 @@ export function PaymentHistoryDetail() {
                                             Quét mã Thanh toán
                                         </h3>
                                         <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                                            Vui lòng quét mã QR chuyển khoản bằng ứng dụng ngân hàng hoặc ví MoMo. Sau khi thanh toán, HùngND sẽ xác nhận.
+                                            Vui lòng quét mã QR chuyển khoản bằng ứng dụng ngân hàng hoặc ví MoMo
                                         </p>
                                     </div>
 
@@ -229,9 +228,9 @@ export function PaymentHistoryDetail() {
                                             <div className="flex flex-col items-center p-4 border border-rose-100 rounded-3xl bg-rose-50/20 group">
                                                 <div className="flex items-center gap-1.5 mb-3 bg-rose-50 text-rose-700 px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wider">
                                                     <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                                                    Momo Wallet
+                                                    Momo
                                                 </div>
-                                                <div className="w-40 h-40 bg-white p-2 rounded-2xl border border-rose-100/50 shadow-md group-hover:scale-105 transition-transform duration-500 flex items-center justify-center overflow-hidden">
+                                                <div className="w-full max-w-[200px] aspect-square bg-white p-1 rounded-2xl border border-rose-100/50 shadow-md group-hover:scale-105 transition-transform duration-500 flex items-center justify-center overflow-hidden">
                                                     <img src={qrMoMo} alt="Momo QR Code" className="w-full h-full object-contain" />
                                                 </div>
                                                 <span className="text-[10px] text-rose-500 font-bold uppercase mt-3 tracking-widest">Nạp Ví Momo</span>
@@ -243,18 +242,18 @@ export function PaymentHistoryDetail() {
                                             <div className="flex flex-col items-center p-4 border border-blue-100 rounded-3xl bg-blue-50/20 group">
                                                 <div className="flex items-center gap-1.5 mb-3 bg-blue-50 text-blue-700 px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wider">
                                                     <Landmark size={12} />
-                                                    VIB Bank
+                                                    VIB
                                                 </div>
-                                                <div className="w-40 h-40 bg-white p-2 rounded-2xl border border-blue-100/50 shadow-md group-hover:scale-105 transition-transform duration-500 flex items-center justify-center overflow-hidden">
+                                                <div className="w-full max-w-[200px] aspect-square bg-white p-1 rounded-2xl border border-blue-100/50 shadow-md group-hover:scale-105 transition-transform duration-500 flex items-center justify-center overflow-hidden">
                                                     <img src={qrVib} alt="VIB QR Code" className="w-full h-full object-contain" />
                                                 </div>
-                                                <span className="text-[10px] text-blue-500 font-bold uppercase mt-3 tracking-widest">Banking Chuyển khoản</span>
+                                                <span className="text-[10px] text-blue-500 font-bold uppercase mt-3 tracking-widest">Chuyển khoản</span>
                                             </div>
                                         )}
                                     </div>
-                                    
+
                                     <div className="bg-amber-50/50 rounded-2xl p-3.5 border border-amber-100/80 text-[11px] text-amber-700 leading-relaxed font-medium">
-                                        👉 <strong>Lưu ý:</strong> Nội dung chuyển khoản vui lòng ghi rõ họ tên và tag name để Admin đối chiếu dễ dàng hơn.
+                                        👉 <strong>Lưu ý:</strong> Nội dung chuyển khoản vui lòng ghi rõ họ tên và tag name để đối chiếu dễ dàng hơn.
                                     </div>
                                 </>
                             ) : (
@@ -265,7 +264,7 @@ export function PaymentHistoryDetail() {
                                     <div className="flex flex-col gap-2">
                                         <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight font-display italic">Giao Dịch Đã Thanh Toán</h3>
                                         <p className="text-sm text-slate-500 leading-relaxed max-w-xs mx-auto">
-                                            Biên lai này đã được Admin xác nhận thanh toán thành công thông qua {history.payment_method === 'momo' ? 'ví MoMo' : 'ngân hàng VIB'}.
+                                            Biên lai này đã được thanh toán thành công thông qua {history.payment_method === 'momo' ? 'ví MoMo' : 'ngân hàng VIB'}.
                                         </p>
                                     </div>
                                     <div className="w-full border-t border-slate-100 pt-6 mt-2 flex flex-col gap-2 text-xs text-slate-400 font-bold uppercase tracking-wider">
@@ -276,11 +275,6 @@ export function PaymentHistoryDetail() {
                         </motion.div>
                     </div>
                 </div>
-            </div>
-
-            {/* Footer */}
-            <div className="max-w-4xl mx-auto w-full text-center mt-12 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                Drink Bill App • HùngND Admin Service
             </div>
         </div>
     );
