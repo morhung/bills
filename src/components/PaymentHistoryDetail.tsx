@@ -1,5 +1,6 @@
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, CheckCircle2, Clock, Calendar, CreditCard, Receipt, FileText, ShoppingBag, Landmark } from 'lucide-react';
 import { paymentHistoryService } from '../services/paymentHistoryService';
@@ -16,6 +17,39 @@ export function PaymentHistoryDetail() {
         enabled: !!id,
         refetchInterval: 5000 // Poll every 5s in case admin approves while user is looking
     });
+
+    const groupedItems = useMemo(() => {
+        if (!history || !history.items) return { groups: {}, sortedKeys: [] };
+
+        const groups: { [key: string]: typeof history.items } = {};
+
+        history.items.forEach(item => {
+            let dateKey = 'Không xác định';
+            if (item.bill_date) {
+                try {
+                    dateKey = format(new Date(item.bill_date), 'dd/MM/yyyy');
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+            if (!groups[dateKey]) {
+                groups[dateKey] = [];
+            }
+            groups[dateKey].push(item);
+        });
+
+        const sortedKeys = Object.keys(groups).sort((a, b) => {
+            if (a === 'Không xác định') return 1;
+            if (b === 'Không xác định') return -1;
+            const partsA = a.split('/');
+            const partsB = b.split('/');
+            const timeA = new Date(parseInt(partsA[2]), parseInt(partsA[1]) - 1, parseInt(partsA[0])).getTime();
+            const timeB = new Date(parseInt(partsB[2]), parseInt(partsB[1]) - 1, parseInt(partsB[0])).getTime();
+            return timeA - timeB;
+        });
+
+        return { groups, sortedKeys };
+    }, [history]);
 
     if (isLoading) {
         return (
@@ -57,24 +91,24 @@ export function PaymentHistoryDetail() {
     const qrVib = generateVietQRVIBString(history.total_amount);
 
     return (
-        <div className="min-h-screen bg-slate-50/60 py-8 px-4 flex flex-col justify-between relative overflow-hidden">
+        <div className="min-h-screen bg-slate-50/60 py-4 px-4 flex flex-col justify-between relative overflow-hidden">
             {/* Subtle background decoration */}
             <div className="absolute top-0 right-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl -z-10"></div>
             <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-secondary/5 rounded-full blur-3xl -z-10"></div>
 
-            <div className="max-w-4xl mx-auto w-full flex-1 flex flex-col gap-6 relative z-10">
+            <div className="max-w-4xl mx-auto w-full flex-1 flex flex-col gap-4 relative z-10">
                 {/* Header Back Navigation */}
                 <div className="flex items-center justify-between">
                     <Link
                         to={userProfileUrl}
-                        className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-800 font-bold text-sm bg-white hover:bg-slate-50 px-4 py-2.5 rounded-2xl border border-slate-100 shadow-sm transition-all active:scale-95"
+                        className="inline-flex items-center gap-1.5 text-slate-500 hover:text-slate-800 font-bold text-xs bg-white hover:bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100 shadow-sm transition-all active:scale-95"
                     >
-                        <ArrowLeft size={16} strokeWidth={2.5} />
+                        <ArrowLeft size={14} strokeWidth={2.5} />
                         {user?.user_name || 'User'}
                     </Link>
-                    <div className="flex items-center gap-2">
-                        <Receipt size={18} className="text-primary" />
-                        <span className="text-xs font-black uppercase tracking-widest text-slate-400">Biên lai thanh toán</span>
+                    <div className="flex items-center gap-1.5">
+                        <Receipt size={16} className="text-primary" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Biên lai</span>
                     </div>
                 </div>
 
@@ -91,9 +125,9 @@ export function PaymentHistoryDetail() {
 
                             <div className="p-6 md:p-8 flex flex-col gap-6">
                                 {/* Header / Title */}
-                                <div className="text-center pb-4 border-b border-slate-100 mt-2">
-                                    <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight italic font-display">Biên Lai Thanh Toán</h2>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Mã hóa đơn: {history.id.slice(0, 8).toUpperCase()}</p>
+                                <div className="text-center pb-3 border-b border-slate-100 mt-1">
+                                    <h2 className="text-lg font-black text-slate-900 uppercase tracking-tight italic font-display">Biên Lai Thanh Toán</h2>
+                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Mã hóa đơn: {history.id.slice(0, 8).toUpperCase()}</p>
                                 </div>
 
                                 {/* Status & Meta Details */}
@@ -156,29 +190,36 @@ export function PaymentHistoryDetail() {
                                         <ShoppingBag size={12} /> Danh sách sản phẩm
                                     </h4>
 
-                                    <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
-                                        {history.items.map((item, index) => (
-                                            <div key={index} className="flex items-center py-2 justify-between gap-4 border-b border-slate-50 last:border-0">
-                                                <div className="flex flex-col">
-                                                    <span className="font-bold text-slate-800 text-sm leading-snug">{item.item_name}</span>
-                                                    {item.bill_date && (
-                                                        <span className="text-[10px] text-slate-400 font-bold">
-                                                            Ngày gọi: {format(new Date(item.bill_date), 'dd/MM/yyyy')}
-                                                        </span>
-                                                    )}
+                                    <div className="flex flex-col gap-4 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
+                                        {groupedItems.sortedKeys.map((dateKey) => (
+                                            <div key={dateKey} className="flex flex-col gap-2.5">
+                                                <div className="flex items-center gap-2 py-0.5">
+                                                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 bg-slate-50 border border-slate-100/60 px-1.5 py-0.5 rounded-md">
+                                                        Ngày {dateKey}
+                                                    </span>
+                                                    <div className="h-px bg-slate-100 flex-1"></div>
                                                 </div>
-                                                <div className="flex items-center gap-4 shrink-0">
-                                                    <span className="text-xs text-slate-800 font-bold bg-slate-100 px-2 py-0.5 rounded-md">SL: {item.quantity}</span>
-                                                    <div className="text-right">
-                                                        <div className="font-black text-slate-900 text-sm">
-                                                            {((item.unit_price * item.quantity) - item.discount_amount).toLocaleString('vi-VN')}đ
-                                                        </div>
-                                                        {item.discount_amount > 0 && (
-                                                            <div className="text-[9px] text-orange-500 font-bold">
-                                                                Giảm: -{item.discount_amount.toLocaleString('vi-VN')}đ
+                                                <div className="flex flex-col gap-2 pl-1">
+                                                    {groupedItems.groups[dateKey].map((item, idx) => (
+                                                        <div key={idx} className="flex items-center py-1.5 justify-between gap-4 border-b border-slate-50 last:border-0">
+                                                            <div className="flex flex-col">
+                                                                <span className="font-bold text-slate-800 text-sm leading-snug">{item.item_name}</span>
                                                             </div>
-                                                        )}
-                                                    </div>
+                                                            <div className="flex items-center gap-4 shrink-0">
+                                                                <span className="text-[10px] text-slate-500 font-bold bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded">SL: {item.quantity}</span>
+                                                                <div className="text-right">
+                                                                    <div className="font-black text-slate-900 text-sm">
+                                                                        {((item.unit_price * item.quantity) - item.discount_amount).toLocaleString('vi-VN')}đ
+                                                                    </div>
+                                                                    {item.discount_amount > 0 && (
+                                                                        <div className="text-[9px] text-orange-500 font-bold">
+                                                                            Giảm: -{item.discount_amount.toLocaleString('vi-VN')}đ
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
                                                 </div>
                                             </div>
                                         ))}
