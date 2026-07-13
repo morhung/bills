@@ -7,4 +7,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
     console.warn('Missing Supabase environment variables. Realtime and database features will not work.');
 }
 
-export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
+export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
+    realtime: {
+        timeout: 40000, // Increase connection timeout to 40s to prevent premature socket closure
+    }
+});

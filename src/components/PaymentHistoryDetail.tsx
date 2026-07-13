@@ -1,4 +1,4 @@
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
@@ -10,27 +10,53 @@ import { vi } from 'date-fns/locale';
 
 export function PaymentHistoryDetail() {
     const { id } = useParams<{ id: string }>();
+    const location = useLocation();
+
+    const stateItem = location.state?.historyItem;
+    const initialData = stateItem && stateItem.id === id ? stateItem : undefined;
 
     const { data: history, isLoading, error } = useQuery({
         queryKey: ['paymentHistory', id],
         queryFn: () => paymentHistoryService.getPaymentHistoryById(id || ''),
         enabled: !!id,
-        refetchInterval: 5000 // Poll every 5s in case admin approves while user is looking
+        initialData: initialData
     });
+
+    const formatSafeDate = (dateStr: any, formatStr: string) => {
+        if (!dateStr) return '—';
+        try {
+            // Normalize space-separated timestamp to ISO 'T' format for Safari compatibility
+            const normalized = typeof dateStr === 'string' ? dateStr.replace(' ', 'T') : dateStr;
+            const date = new Date(normalized);
+            if (isNaN(date.getTime())) return '—';
+            return format(date, formatStr, { locale: vi });
+        } catch (e) {
+            console.error('Error formatting date:', dateStr, e);
+            return '—';
+        }
+    };
 
     const groupedItems = useMemo(() => {
         if (!history || !history.items) return { groups: {}, sortedKeys: [] };
 
-        const groups: { [key: string]: typeof history.items } = {};
+        let itemsArray = history.items;
+        if (typeof itemsArray === 'string') {
+            try {
+                itemsArray = JSON.parse(itemsArray);
+            } catch (e) {
+                console.error('Failed to parse history items JSON string:', e);
+                return { groups: {}, sortedKeys: [] };
+            }
+        }
 
-        history.items.forEach(item => {
+        if (!Array.isArray(itemsArray)) return { groups: {}, sortedKeys: [] };
+
+        const groups: { [key: string]: any[] } = {};
+
+        itemsArray.forEach((item: any) => {
             let dateKey = 'Không xác định';
             if (item.bill_date) {
-                try {
-                    dateKey = format(new Date(item.bill_date), 'dd/MM/yyyy');
-                } catch (e) {
-                    console.error(e);
-                }
+                dateKey = formatSafeDate(item.bill_date, 'dd/MM/yyyy');
             }
             if (!groups[dateKey]) {
                 groups[dateKey] = [];
@@ -50,6 +76,17 @@ export function PaymentHistoryDetail() {
 
         return { groups, sortedKeys };
     }, [history]);
+
+    // Generate QR codes for the total debt amount of this specific history entry
+    const qrMoMo = useMemo(() => {
+        if (!history) return '';
+        return generateVietQRString(history.total_amount);
+    }, [history?.total_amount]);
+
+    const qrVib = useMemo(() => {
+        if (!history) return '';
+        return generateVietQRVIBString(history.total_amount);
+    }, [history?.total_amount]);
 
     if (isLoading) {
         return (
@@ -83,12 +120,10 @@ export function PaymentHistoryDetail() {
     }
 
     const { user } = history;
-    const userProfileUrl = user ? `/${user.tag_id.replace('-runsystem.net', '')}` : '/';
-    const isPaid = history.status === 'paid';
-
-    // Generate QR codes for the total debt amount of this specific history entry
-    const qrMoMo = generateVietQRString(history.total_amount);
-    const qrVib = generateVietQRVIBString(history.total_amount);
+    const userProfileUrl = (user && typeof user.tag_id === 'string') 
+        ? `/${user.tag_id.replace('-runsystem.net', '')}` 
+        : '/';
+    const isPaid = !!history.is_paid;
 
     return (
         <div className="min-h-screen bg-slate-50/60 py-4 px-4 flex flex-col justify-between relative overflow-hidden">
@@ -155,7 +190,7 @@ export function PaymentHistoryDetail() {
                                             <Calendar size={12} /> Ngày thông báo:
                                         </span>
                                         <span className="font-bold text-slate-700">
-                                            {format(new Date(history.sent_at), 'dd/MM/yyyy HH:mm', { locale: vi })}
+                                            {formatSafeDate(history.sent_at, 'dd/MM/yyyy HH:mm')}
                                         </span>
                                     </div>
                                     {isPaid && (
@@ -165,7 +200,7 @@ export function PaymentHistoryDetail() {
                                                     <Clock size={12} /> Ngày thanh toán:
                                                 </span>
                                                 <span className="font-bold text-slate-700">
-                                                    {history.paid_at ? format(new Date(history.paid_at), 'dd/MM/yyyy HH:mm', { locale: vi }) : '—'}
+                                                    {formatSafeDate(history.paid_at, 'dd/MM/yyyy HH:mm')}
                                                 </span>
                                             </div>
                                             <div className="flex justify-between items-center">

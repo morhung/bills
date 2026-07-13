@@ -183,11 +183,12 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                 const nameStr = u ? u.user_name : '';
                 const dateStr = new Date(h.sent_at).toLocaleDateString('vi-VN');
                 const methodStr = h.payment_method || '';
+                const statusStr = h.is_paid ? 'da thanh toan paid' : 'chua thanh toan unpaid';
                 return (
                     removeAccents(nameStr).toLowerCase().includes(normalizedSearch) ||
                     dateStr.includes(normalizedSearch) ||
                     h.total_amount.toString().includes(normalizedSearch) ||
-                    h.status.includes(normalizedSearch) ||
+                    statusStr.includes(normalizedSearch) ||
                     methodStr.toLowerCase().includes(normalizedSearch)
                 );
             });
@@ -195,8 +196,8 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
 
         // Sort: 1. 'unpaid' status comes first. 2. Sorted by sent_at desc (newest first).
         return result.sort((a, b) => {
-            const isUnpaidA = a.status === 'unpaid';
-            const isUnpaidB = b.status === 'unpaid';
+            const isUnpaidA = !a.is_paid;
+            const isUnpaidB = !b.is_paid;
 
             if (isUnpaidA && !isUnpaidB) return -1;
             if (!isUnpaidA && isUnpaidB) return 1;
@@ -1129,7 +1130,7 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                                             {filteredPaymentHistories.map((h: any) => {
                                                 const u = users?.find(user => user.id === h.user_id);
                                                 const formattedDate = new Date(h.sent_at).toLocaleDateString('vi-VN');
-                                                const isPaid = h.status === 'paid';
+                                                const isPaid = !!h.is_paid;
                                                 return (
                                                     <tr key={h.id} className="hover:bg-white/60 transition-all duration-300">
                                                         <td className="px-6 py-4">
