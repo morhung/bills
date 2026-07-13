@@ -2,21 +2,23 @@ import { Header } from './components/Header';
 import { Summary } from './components/Summary';
 import { FilterBar } from './components/FilterBar';
 import { BillList } from './components/BillList';
-import { AdminPage } from './components/AdminPage';
-import { LoginPage } from './components/LoginPage';
-import { LandingPage } from './components/LandingPage';
-import { PaymentHistoryDetail } from './components/PaymentHistoryDetail';
 import { useBills } from './hooks/useBills';
 import { usePaymentHistory } from './hooks/usePaymentHistory';
 import { userService } from './services/userService';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Routes, Route, useLocation, Navigate, useParams, Link } from 'react-router-dom';
 import { supabase } from './lib/supabase';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, lazy, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MainSkeleton } from './components/MainSkeleton';
 import { generateVietQRString } from './services/vietQRService';
 import type { Session } from '@supabase/supabase-js';
+
+// Lazy load pages to split the bundle and optimize initial load performance
+const LoginPage = lazy(() => import('./components/LoginPage').then(m => ({ default: m.LoginPage })));
+const LandingPage = lazy(() => import('./components/LandingPage').then(m => ({ default: m.LandingPage })));
+const AdminPage = lazy(() => import('./components/AdminPage').then(m => ({ default: m.AdminPage })));
+const PaymentHistoryDetail = lazy(() => import('./components/PaymentHistoryDetail').then(m => ({ default: m.PaymentHistoryDetail })));
 
 const PaymentHistoryList = ({ histories, loading }: { histories: any[]; loading: boolean }) => {
     if (loading) {
@@ -274,12 +276,22 @@ function App() {
             <AnimatePresence mode="wait">
                 <Routes location={location} key={location.pathname}>
                     <Route path="/login" element={
-                        session ? <Navigate to="/admin" replace /> : <LoginPage />
+                        <Suspense fallback={<MainSkeleton />}>
+                            {session ? <Navigate to="/admin" replace /> : <LoginPage />}
+                        </Suspense>
                     } />
 
-                    <Route path="/" element={<LandingPage />} />
+                    <Route path="/" element={
+                        <Suspense fallback={<MainSkeleton />}>
+                            <LandingPage />
+                        </Suspense>
+                    } />
                     <Route path="/:userId" element={<MainView session={session} />} />
-                    <Route path="/payment-history/:id" element={<PaymentHistoryDetail />} />
+                    <Route path="/payment-history/:id" element={
+                        <Suspense fallback={<MainSkeleton />}>
+                            <PaymentHistoryDetail />
+                        </Suspense>
+                    } />
 
                     <Route path="/admin" element={
                         session ? (
@@ -290,7 +302,9 @@ function App() {
                                     exit={{ opacity: 0, x: -20 }}
                                     className="flex-1 flex flex-col h-full overflow-hidden"
                                 >
-                                    <AdminPage userEmail={session?.user?.email} />
+                                    <Suspense fallback={<MainSkeleton />}>
+                                        <AdminPage userEmail={session?.user?.email} />
+                                    </Suspense>
                                 </motion.div>
                             </main>
                         ) : (
