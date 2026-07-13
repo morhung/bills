@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, useDeferredValue } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, FileText, Shield, Trash2, Edit3, Plus, Bell, CreditCard, ChevronLeft, ChevronRight, Calendar, User as UserIcon, LogOut, ChevronDown } from 'lucide-react';
 import type { DetailedBill, BillItem, User } from '../types/database';
@@ -28,7 +28,6 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
 
     // UI States for enhanced filters
     const [userSearchInput, setUserSearchInput] = useState('');
-    const deferredUserSearchInput = useDeferredValue(userSearchInput);
     const [isUserSuggestionsOpen, setIsUserSuggestionsOpen] = useState(false);
     const [isDatePopupOpen, setIsDatePopupOpen] = useState(false);
 
@@ -50,7 +49,6 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
 
     const [activeTab, setActiveTab] = useState<'users' | 'bills' | 'payment_history'>('users');
     const [searchQuery, setSearchQuery] = useState('');
-    const deferredSearchQuery = useDeferredValue(searchQuery);
     const [expandedBillId, setExpandedBillId] = useState<string | null>(null);
     const [isAddBillOpen, setIsAddBillOpen] = useState(false);
     const [isAddUserOpen, setIsAddUserOpen] = useState(false);
@@ -89,7 +87,7 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
 
     const userSuggestions = useMemo(() => {
         if (!users) return [];
-        const input = deferredUserSearchInput.toLowerCase().replace('@', '').trim();
+        const input = userSearchInput.toLowerCase().replace('@', '').trim();
 
         const filtered = users.filter(u =>
             u.tag_id.toLowerCase().includes(input) ||
@@ -102,13 +100,13 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
         }
 
         return filtered;
-    }, [deferredUserSearchInput, users]);
+    }, [userSearchInput, users]);
 
     const filteredUsers = useMemo(() => {
         if (!users) return [];
 
         let result = [...users];
-        const normalizedSearch = removeAccents(deferredSearchQuery).trim().toLowerCase();
+        const normalizedSearch = removeAccents(searchQuery).trim().toLowerCase();
 
         if (normalizedSearch) {
             result = result.filter((u: User) =>
@@ -146,11 +144,11 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
             // Group 3: Zero Debt
             return (a.user_name || '').localeCompare(b.user_name || '', 'vi');
         });
-    }, [deferredSearchQuery, users]);
+    }, [searchQuery, users]);
 
     const filteredBills = useMemo(() => {
         if (!bills) return [];
-        const normalizedSearch = removeAccents(deferredSearchQuery).trim();
+        const normalizedSearch = removeAccents(searchQuery).trim();
         if (!normalizedSearch) return bills;
 
         return bills.filter((b: DetailedBill) => {
@@ -167,7 +165,7 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                 removeAccents(b.users?.user_name || '').includes(normalizedSearch)
             );
         });
-    }, [deferredSearchQuery, bills]);
+    }, [searchQuery, bills]);
 
     const filteredTotalAmount = useMemo(() => {
         return filteredBills.reduce((acc, b) => acc + (b.total_amount || 0), 0);
@@ -177,7 +175,7 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
         if (!allPaymentHistories) return [];
 
         let result = [...allPaymentHistories];
-        const normalizedSearch = removeAccents(deferredSearchQuery).trim().toLowerCase();
+        const normalizedSearch = removeAccents(searchQuery).trim().toLowerCase();
 
         if (normalizedSearch) {
             result = result.filter((h: any) => {
@@ -185,21 +183,20 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                 const nameStr = u ? u.user_name : '';
                 const dateStr = new Date(h.sent_at).toLocaleDateString('vi-VN');
                 const methodStr = h.payment_method || '';
-                const statusStr = h.is_paid ? 'da thanh toan paid' : 'chua thanh toan unpaid';
                 return (
                     removeAccents(nameStr).toLowerCase().includes(normalizedSearch) ||
                     dateStr.includes(normalizedSearch) ||
                     h.total_amount.toString().includes(normalizedSearch) ||
-                    statusStr.includes(normalizedSearch) ||
+                    h.status.includes(normalizedSearch) ||
                     methodStr.toLowerCase().includes(normalizedSearch)
                 );
             });
         }
 
-        // Sort: 1. 'unpaid' (is_paid === false) comes first. 2. Sorted by sent_at desc (newest first).
+        // Sort: 1. 'unpaid' status comes first. 2. Sorted by sent_at desc (newest first).
         return result.sort((a, b) => {
-            const isUnpaidA = !a.is_paid;
-            const isUnpaidB = !b.is_paid;
+            const isUnpaidA = a.status === 'unpaid';
+            const isUnpaidB = b.status === 'unpaid';
 
             if (isUnpaidA && !isUnpaidB) return -1;
             if (!isUnpaidA && isUnpaidB) return 1;
@@ -209,7 +206,7 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
             const dateB = new Date(b.sent_at).getTime();
             return dateB - dateA;
         });
-    }, [deferredSearchQuery, allPaymentHistories, users]);
+    }, [searchQuery, allPaymentHistories, users]);
 
     const handleSaveBill = async (billData: any) => {
         try {
@@ -1132,7 +1129,7 @@ export function AdminPage({ userEmail }: { userEmail?: string }) {
                                             {filteredPaymentHistories.map((h: any) => {
                                                 const u = users?.find(user => user.id === h.user_id);
                                                 const formattedDate = new Date(h.sent_at).toLocaleDateString('vi-VN');
-                                                const isPaid = h.is_paid;
+                                                const isPaid = h.status === 'paid';
                                                 return (
                                                     <tr key={h.id} className="hover:bg-white/60 transition-all duration-300">
                                                         <td className="px-6 py-4">

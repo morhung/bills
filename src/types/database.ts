@@ -62,7 +62,7 @@ export type PaymentHistory = {
     id: string;
     user_id: string;
     total_amount: number;
-    is_paid: boolean;
+    status: 'unpaid' | 'paid';
     sent_at: string;
     paid_at: string | null;
     payment_method: 'momo' | 'vib' | null;
