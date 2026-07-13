@@ -15,8 +15,9 @@ export function useUsers(enabled: boolean = true) {
     });
 
     useEffect(() => {
+        const channelName = `users_realtime_${Math.random().toString(36).substring(7)}`;
         const subscription = supabase
-            .channel('users_realtime')
+            .channel(channelName)
             .on(
                 'postgres_changes',
                 { event: '*', table: 'users', schema: 'public' },

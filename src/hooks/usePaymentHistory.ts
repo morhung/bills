@@ -24,8 +24,9 @@ export function usePaymentHistory(userId?: string, enabled: boolean = true) {
         const isEnvMissing = !import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL.includes('your-project-id');
         if (isEnvMissing) return;
 
+        const channelName = `payment_history_realtime_${userId || 'all'}_${Math.random().toString(36).substring(7)}`;
         const historySubscription = supabase
-            .channel('payment_history_realtime')
+            .channel(channelName)
             .on(
                 'postgres_changes',
                 { event: '*', table: 'payment_history', schema: 'public' },

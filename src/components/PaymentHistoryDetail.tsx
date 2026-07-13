@@ -1,29 +1,62 @@
-import { useParams, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useParams, Link, useLocation } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, CheckCircle2, Clock, Calendar, CreditCard, Receipt, FileText, ShoppingBag, Landmark } from 'lucide-react';
 import { paymentHistoryService } from '../services/paymentHistoryService';
 import { generateVietQRString, generateVietQRVIBString } from '../services/vietQRService';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import { supabase } from '../lib/supabase';
 
 export function PaymentHistoryDetail() {
     const { id } = useParams<{ id: string }>();
+    const location = useLocation();
+    const queryClient = useQueryClient();
+
+    const stateItem = location.state?.historyItem;
+    const initialData = stateItem && stateItem.id === id ? stateItem : undefined;
 
     const { data: history, isLoading, error } = useQuery({
         queryKey: ['paymentHistory', id],
         queryFn: () => paymentHistoryService.getPaymentHistoryById(id || ''),
         enabled: !!id,
-        refetchInterval: 5000 // Poll every 5s in case admin approves while user is looking
+        initialData: initialData
     });
+
+    useEffect(() => {
+        if (!id) return;
+
+        const isEnvMissing = !import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL.includes('your-project-id');
+        if (isEnvMissing) return;
+
+        const sub = supabase
+            .channel(`payment_detail_realtime_${id}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    table: 'payment_history',
+                    schema: 'public',
+                    filter: `id=eq.${id}`
+                },
+                () => {
+                    queryClient.invalidateQueries({ queryKey: ['paymentHistory', id] });
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(sub);
+        };
+    }, [id, queryClient]);
 
     const groupedItems = useMemo(() => {
         if (!history || !history.items) return { groups: {}, sortedKeys: [] };
 
         const groups: { [key: string]: typeof history.items } = {};
 
-        history.items.forEach(item => {
+        history.items.forEach((item: any) => {
             let dateKey = 'Không xác định';
             if (item.bill_date) {
                 try {
@@ -84,11 +117,11 @@ export function PaymentHistoryDetail() {
 
     const { user } = history;
     const userProfileUrl = user ? `/${user.tag_id.replace('-runsystem.net', '')}` : '/';
-    const isPaid = history.status === 'paid';
+    const isPaid = !!history.is_paid;
 
     // Generate QR codes for the total debt amount of this specific history entry
-    const qrMoMo = generateVietQRString(history.total_amount);
-    const qrVib = generateVietQRVIBString(history.total_amount);
+    const qrMoMo = useMemo(() => generateVietQRString(history.total_amount), [history.total_amount]);
+    const qrVib = useMemo(() => generateVietQRVIBString(history.total_amount), [history.total_amount]);
 
     return (
         <div className="min-h-screen bg-slate-50/60 py-4 px-4 flex flex-col justify-between relative overflow-hidden">
@@ -200,7 +233,7 @@ export function PaymentHistoryDetail() {
                                                     <div className="h-px bg-slate-100 flex-1"></div>
                                                 </div>
                                                 <div className="flex flex-col gap-2 pl-1">
-                                                    {groupedItems.groups[dateKey].map((item, idx) => (
+                                                    {groupedItems.groups[dateKey].map((item: any, idx: number) => (
                                                         <div key={idx} className="flex items-center py-1.5 justify-between gap-4 border-b border-slate-50 last:border-0">
                                                             <div className="flex flex-col">
                                                                 <span className="font-bold text-slate-800 text-sm leading-snug">{item.item_name}</span>

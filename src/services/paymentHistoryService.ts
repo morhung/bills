@@ -11,7 +11,7 @@ export const paymentHistoryService = {
             .from('payment_history')
             .select('id')
             .eq('user_id', userId)
-            .eq('status', 'unpaid')
+            .eq('is_paid', false)
             .maybeSingle();
 
         if (error && error.code !== 'PGRST116') {
@@ -46,7 +46,7 @@ export const paymentHistoryService = {
                 .insert({
                     user_id: userId,
                     total_amount: amount,
-                    status: 'unpaid',
+                    is_paid: false,
                     items: items,
                     sent_at: now
                 })
@@ -66,7 +66,7 @@ export const paymentHistoryService = {
      */
     async getPaymentHistories(userId?: string): Promise<PaymentHistory[]> {
         let query = supabase
-            .from('payment_history')
+            .from('getPaymentHistory')
             .select('*');
 
         if (userId) {
@@ -88,7 +88,7 @@ export const paymentHistoryService = {
      */
     async getPaymentHistoryById(id: string): Promise<(PaymentHistory & { user?: any }) | null> {
         const { data, error } = await supabase
-            .from('payment_history')
+            .from('getPaymentHistory')
             .select('*')
             .eq('id', id)
             .maybeSingle();
@@ -100,20 +100,19 @@ export const paymentHistoryService = {
 
         if (!data) return null;
 
-        // Fetch user details manually to prevent PostgREST relation-naming errors
-        const { data: userData, error: userError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', data.user_id)
-            .maybeSingle();
-
-        if (userError) {
-            console.error('Error fetching user for payment history:', userError);
-        }
-
         return {
-            ...(data as PaymentHistory),
-            user: userData || null
+            id: data.id,
+            user_id: data.user_id,
+            total_amount: data.total_amount,
+            is_paid: data.is_paid,
+            sent_at: data.sent_at,
+            paid_at: data.paid_at,
+            payment_method: data.payment_method,
+            items: data.items,
+            user: {
+                user_name: data.user_name,
+                tag_id: data.tag_id
+            }
         };
     },
 
@@ -124,7 +123,7 @@ export const paymentHistoryService = {
         const { error } = await supabase
             .from('payment_history')
             .update({
-                status: 'paid',
+                is_paid: true,
                 payment_method: paymentMethod,
                 paid_at: new Date().toISOString()
             })
@@ -145,7 +144,7 @@ export const paymentHistoryService = {
             .from('payment_history')
             .select('id')
             .eq('user_id', userId)
-            .eq('status', 'unpaid')
+            .eq('is_paid', false)
             .order('sent_at', { ascending: false })
             .limit(1)
             .maybeSingle();
@@ -164,7 +163,7 @@ export const paymentHistoryService = {
                 .insert({
                     user_id: userId,
                     total_amount: totalAmount,
-                    status: 'paid',
+                    is_paid: true,
                     payment_method: paymentMethod,
                     paid_at: now,
                     sent_at: now,

@@ -24,8 +24,8 @@ export function useBills(filters?: BillFilters, enabled: boolean = true) {
         const isEnvMissing = !import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL.includes('your-project-id');
         if (isEnvMissing) return;
 
-        const billsSubscription = supabase
-            .channel('bills_realtime')
+        const subscription = supabase
+            .channel('bills_and_items_realtime')
             .on(
                 'postgres_changes',
                 { event: '*', table: 'bills', schema: 'public' },
@@ -33,10 +33,6 @@ export function useBills(filters?: BillFilters, enabled: boolean = true) {
                     queryClient.invalidateQueries({ queryKey: ['bills'] });
                 }
             )
-            .subscribe();
-
-        const itemsSubscription = supabase
-            .channel('items_realtime')
             .on(
                 'postgres_changes',
                 { event: '*', table: 'bill_items', schema: 'public' },
@@ -47,8 +43,7 @@ export function useBills(filters?: BillFilters, enabled: boolean = true) {
             .subscribe();
 
         return () => {
-            supabase.removeChannel(billsSubscription);
-            supabase.removeChannel(itemsSubscription);
+            supabase.removeChannel(subscription);
         };
     }, [queryClient]);
 
