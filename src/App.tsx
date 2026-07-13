@@ -47,7 +47,7 @@ const PaymentHistoryList = ({ histories, loading }: { histories: any[]; loading:
         <div className="flex flex-col gap-2 pb-12 w-full">
             {histories.map((h: any) => {
                 const formattedDate = new Date(h.sent_at).toLocaleDateString('vi-VN');
-                const isPaid = h.status === 'paid';
+                const isPaid = !!h.is_paid;
                 return (
                     <Link
                         key={h.id}

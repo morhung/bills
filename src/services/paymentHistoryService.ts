@@ -11,7 +11,7 @@ export const paymentHistoryService = {
             .from('payment_history')
             .select('id')
             .eq('user_id', userId)
-            .eq('status', 'unpaid')
+            .eq('is_paid', false)
             .maybeSingle();
 
         if (error && error.code !== 'PGRST116') {
@@ -46,7 +46,7 @@ export const paymentHistoryService = {
                 .insert({
                     user_id: userId,
                     total_amount: amount,
-                    status: 'unpaid',
+                    is_paid: false,
                     items: items,
                     sent_at: now
                 })
@@ -123,7 +123,7 @@ export const paymentHistoryService = {
         const { error } = await supabase
             .from('payment_history')
             .update({
-                status: 'paid',
+                is_paid: true,
                 payment_method: paymentMethod,
                 paid_at: new Date().toISOString()
             })
@@ -144,7 +144,7 @@ export const paymentHistoryService = {
             .from('payment_history')
             .select('id')
             .eq('user_id', userId)
-            .eq('status', 'unpaid')
+            .eq('is_paid', false)
             .order('sent_at', { ascending: false })
             .limit(1)
             .maybeSingle();
@@ -163,7 +163,7 @@ export const paymentHistoryService = {
                 .insert({
                     user_id: userId,
                     total_amount: totalAmount,
-                    status: 'paid',
+                    is_paid: true,
                     payment_method: paymentMethod,
                     paid_at: now,
                     sent_at: now,
